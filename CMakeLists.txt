@@ -23,6 +23,27 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/lib/Debug)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/lib/Release)
 set(THIRD_PARTY_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty)
 
+include(FetchContent)
+set(FETCHCONTENT_BASE_DIR ${CMAKE_SOURCE_DIR}/thirdParty)
+
+FetchContent_Declare(
+	glm
+	GIT_REPOSITORY	https://github.com/g-truc/glm.git
+	GIT_TAG 	bf71a834948186f4097caa076cd2663c69a10e1e #refs/tags/1.0.1
+)
+FetchContent_MakeAvailable(glm)
+
+FetchContent_Declare(
+	glfw
+	GIT_REPOSITORY	https://github.com/glfw/glfw.git
+	GIT_TAG 	3.4
+)
+
+set(GLFW_BUILD_TESTS OFF)
+set(GLFW_BUILD_EXAMPLES OFF)
+
+FetchContent_MakeAvailable(glfw)
+
 # Add source to this project's executable.
 add_subdirectory(Engine)
 add_subdirectory(Editor)
