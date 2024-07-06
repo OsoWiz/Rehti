@@ -1,3 +1,0 @@
-C:/Users/otsol/source/repos/Rehti/CMakeFiles/Rehti.dir
-C:/Users/otsol/source/repos/Rehti/CMakeFiles/ALL_BUILD.dir
-C:/Users/otsol/source/repos/Rehti/CMakeFiles/ZERO_CHECK.dir

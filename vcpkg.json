@@ -1,0 +1,19 @@
+{
+	"dependencies": [
+		"vulkan-headers",
+		"vulkan-loader",
+		"vulkan-sdk-components",
+		{
+			"name": "imgui",
+			"features": [ "vulkan-binding", "sdl2-binding" ]
+		},
+		"sdl2-image",
+		"assimp",
+		"flecs",
+		{
+            	"name": "sdl2",
+            	"features": [ "vulkan" ]
+        	}
+	]
+
+}
