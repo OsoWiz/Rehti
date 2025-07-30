@@ -2,18 +2,28 @@
 	"dependencies": [
 		"vulkan-headers",
 		"vulkan-loader",
-		"vulkan-sdk-components",
+		"jsoncpp",
+		"glm",
+		"shaderc",
+		"spirv-headers",
+		"spirv-cross",
+		"spirv-reflect",
+		"vulkan-memory-allocator",
+		"vulkan-validationlayers",
+		"glslang",
+		"jsoncpp",
 		{
 			"name": "imgui",
-			"features": [ "vulkan-binding", "sdl2-binding" ]
+			"features": [ "vulkan-binding", "sdl3-binding" ]
 		},
-		"sdl2-image",
+		{
+            		"name": "sdl3",
+            		"features": [ "vulkan" ]
+        	},
+		"sdl3-image",
 		"assimp",
 		"flecs",
-		{
-            	"name": "sdl2",
-            	"features": [ "vulkan" ]
-        	}
+		"gtest"
 	]
 
 }

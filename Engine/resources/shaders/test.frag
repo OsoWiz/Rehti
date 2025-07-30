@@ -1,5 +1,3 @@
-
-R""(
 #version 450 core
 
 layout(location = 0) in vec3 fragPos;
@@ -10,5 +8,3 @@ void main()
 	vec3 color = clamp(abs(fragPos), 0.f, 1.f);
 	outColor = vec4(color, 1.0);
 }
-
-)"";

@@ -1,12 +1,12 @@
 #pragma once
-#include <vma/vk_mem_alloc.h>
 
-#include "GraphicsResources.h"
+#include "GraphicsResources.hpp"
+#include <cstdint>
 
 struct CachedModelEntry
 {
-	RehtiGraphics::Buffer vertexBuffer;
-	RehtiGraphics::Buffer indexBuffer;
+	Buffer vertexBuffer;
+	Buffer indexBuffer;
 	uint64_t entryId;
 	uint32_t referenceCount;
 };
@@ -20,6 +20,5 @@ public:
 
 private:
 	VmaAllocator allocator;
-
 };
 

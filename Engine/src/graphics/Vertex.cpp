@@ -1,7 +1,8 @@
-#include "Vertex.h"
+#include "Vertex.hpp"
 
+#include <vulkan/vulkan.h>
 
-VkFormat RehtiGraphics::getFormatFromEnum(RehtiGraphics::VertexAttributeEnum attribute)
+VkFormat getFormatFromEnum(VertexAttributeEnum attribute)
 {
 	switch (attribute)
 	{
@@ -23,56 +24,59 @@ VkFormat RehtiGraphics::getFormatFromEnum(RehtiGraphics::VertexAttributeEnum att
 	return VK_FORMAT_UNDEFINED;
 }
 
-uint32_t attributeEnumToSize(RehtiGraphics::VertexAttributeEnum venum)
-{ // todo just ask the size of the vec somehow?
+uint32_t attributeEnumToSize(VertexAttributeEnum venum)
+{
 	switch (venum)
 	{
-		case RehtiGraphics::VertexAttributeEnum::POSITION:
+		case VertexAttributeEnum::POSITION:
 			return 3;
-		case RehtiGraphics::VertexAttributeEnum::NORMAL:
+		case VertexAttributeEnum::NORMAL:
 			return 3;
-		case RehtiGraphics::VertexAttributeEnum::COLOR:
+		case VertexAttributeEnum::COLOR:
 			return 4;
-		case RehtiGraphics::VertexAttributeEnum::TEXCOORD:
+		case VertexAttributeEnum::TEXCOORD:
 			return 2;
-		case RehtiGraphics::VertexAttributeEnum::TANGENT:
+		case VertexAttributeEnum::TANGENT:
 			return 3;
-		case RehtiGraphics::VertexAttributeEnum::JOINTS:
+		case VertexAttributeEnum::JOINTS:
 			return 4;
-		case RehtiGraphics::VertexAttributeEnum::WEIGHTS:
+		case VertexAttributeEnum::WEIGHTS:
 			return 4;
 		default:
 			return 0;
 	}
 }
 
-uint32_t calculateOffset(RehtiGraphics::VertexAttributeEnum attribute)
+VertexAttributeInfo getAttributeInfo(VertexAttributeEnum attribute)
+{
+	switch (attribute)
+	{
+		case VertexAttributeEnum::POSITION:
+			return { VK_FORMAT_R32G32B32_SFLOAT, sizeof(glm::vec3) };
+		case VertexAttributeEnum::NORMAL:
+			return { VK_FORMAT_R32G32B32_SFLOAT, sizeof(glm::vec3) };
+		case VertexAttributeEnum::COLOR:
+			return { VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(glm::vec4) };
+		case VertexAttributeEnum::TEXCOORD:
+			return { VK_FORMAT_R32G32_SFLOAT, sizeof(glm::vec2) };
+		case VertexAttributeEnum::TANGENT:
+			return { VK_FORMAT_R32G32B32_SFLOAT, sizeof(glm::vec3) };
+		case VertexAttributeEnum::JOINTS:
+			return { VK_FORMAT_R32G32B32A32_UINT, sizeof(glm::uvec4) };
+		case VertexAttributeEnum::WEIGHTS:
+			return { VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(glm::vec4) };
+		default:
+			return { VK_FORMAT_UNDEFINED, 0 };
+	}
+}
+
+uint32_t calculateOffset(VertexAttributeEnum attribute)
 {
 	uint32_t offset = 0;
 
-	for (uint16_t e = RehtiGraphics::VertexAttributeEnum::POSITION; e < (uint16_t)attribute; e++)
+	for (uint16_t e = VertexAttributeEnum::POSITION; e < (uint16_t)attribute; e++)
 	{
-		offset += attributeEnumToSize((RehtiGraphics::VertexAttributeEnum)e);
+		offset += attributeEnumToSize((VertexAttributeEnum)e);
 	}
 	return offset;
-}
-
-std::vector<VkVertexInputAttributeDescription> RehtiGraphics::getVertexAttributes(std::set<VertexAttributeEnum> attributes, uint32_t vertexBinding)
-{
-	std::vector<VkVertexInputAttributeDescription> selectedAttributes;
-	for (auto attribute : attributes)
-	{
-		VkFormat format = RehtiGraphics::getFormatFromEnum(attribute);
-		if (format != VK_FORMAT_UNDEFINED)
-		{
-			VkVertexInputAttributeDescription newAttribute{};
-			newAttribute.binding = vertexBinding;
-			newAttribute.location = selectedAttributes.size();
-			newAttribute.format = format;
-			newAttribute.offset = calculateOffset(attribute); // still pretty ass? 
-			selectedAttributes.push_back(newAttribute);
-		}
-	}
-
-	return selectedAttributes;
 }

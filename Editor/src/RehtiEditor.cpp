@@ -1,5 +1,5 @@
 #include <iostream>
-#include <Rehti.h>
+#include <Rehti.hpp>
 int main()
 {
 	std::cout << "Hello, RehtiEditor!" << std::endl;

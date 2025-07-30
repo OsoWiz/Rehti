@@ -1,9 +1,8 @@
-#pragma once
 #include <flecs.h>
 #include <string>
 
-#include "EntityAttributes.h"
-#include "GraphicsTypes.h"
+#include "BasicAttributes.hpp"
+#include "GraphicsTypes.hpp"
 
 class EntityManager
 {

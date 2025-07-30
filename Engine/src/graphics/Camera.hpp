@@ -1,33 +1,7 @@
 #pragma once
-#pragma once
-// Include both standard functionality and the extensions
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/ext.hpp>
 #include <glm/glm.hpp>
-
+#include <glm/gtc/constants.hpp>
 #include <functional>
-
-// Forward declarations
-struct GLFWwindow;
-
-// TODO figure out how camera should function with the player target.
-struct Target
-{
-	glm::vec3 pos;
-};
-// standard cartesian coordinate system
-constexpr glm::vec3 POSITIVE_X_AXIS(1.f, 0.f, 0.f);
-constexpr glm::vec3 POSITIVE_Y_AXIS(0.f, 1.f, 0.f);
-constexpr glm::vec3 POSITIVE_Z_AXIS(0.f, 0.f, 1.f);
-
-constexpr float STANDARD_ZOOM(12.f); // zoom used in the constructor. 10 Units away from the target
-constexpr float MIN_ZOOM(2.f);       // minimum zoom
-constexpr float MAX_ZOOM(25.f);      // maximum zoom
-
-/**
- * @ brief Camera class that enables orbiting around a target.
- *		This class allows querying for view and projection matrices or a combination of both.
- */
 
 class Camera
 {
@@ -166,13 +140,13 @@ private:
 	glm::mat4 getCameraMatrixOrigon() const;
 
 	// These encapsulate most important aspects of the camera.
-	// cameraMatrixM wastes currently 4 floats, but it's easier to work with.
+	// cameraMatrix wastes currently 4 floats, but it's easier to work with.
 	glm::mat4 cameraMatrix;
 	glm::mat4 projectionMatrix;
 	glm::vec3 target;
 	float sensitivity;
 	float zoomSensitivity;
-	float zoom;
+	float currentZoom;
 	float width;
 	float height;
 
@@ -183,4 +157,3 @@ private:
 	static std::function<void(glm::vec2)> cameraUpdateCallback;                      ///< Callback for updating the camera
 	static std::function<void(float)> cameraZoomCallback;                            ///< Callback for updating the camera
 };
-

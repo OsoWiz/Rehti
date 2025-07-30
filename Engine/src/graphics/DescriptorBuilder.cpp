@@ -1,8 +1,4 @@
-#include "DescriptorBuilder.h"
-
-#include <algorithm>
-#include <functional>
-#include <stdexcept>
+#include "DescriptorBuilder.hpp"
 
 PoolManager::PoolManager(VkDevice device)
 	: logDevice(device), currentPool(VK_NULL_HANDLE)
@@ -218,11 +214,11 @@ size_t DescriptorSetLayoutCache::DescriptorSetLayoutInfo::hash() const
 	return res;
 }
 
-DescriptorBuilder::DescriptorBuilder(PoolManager& poolManager, DescriptorSetLayoutCache& cache)
+DescriptorBuilder::DescriptorBuilder(VkDevice device)
 	: currentBinding(0)
 {
-	pPoolManager = std::make_unique<PoolManager>(poolManager);
-	pLayoutCache = std::make_unique<DescriptorSetLayoutCache>(cache);
+	pPoolManager = std::make_unique<PoolManager>(device);
+	pLayoutCache = std::make_unique<DescriptorSetLayoutCache>(device);
 }
 
 DescriptorBuilder::~DescriptorBuilder()
@@ -370,6 +366,16 @@ bool DescriptorBuilder::build(VkDescriptorSet& set)
 void DescriptorBuilder::setDescriptorSetLayout(const VkDescriptorSetLayoutBinding* bindings, uint32_t bindingCount, VkDescriptorSetLayout& layout)
 {
 	layout = pLayoutCache->createDescriptorSetLayout(bindings, bindingCount);
+}
+
+VkDescriptorSetLayout DescriptorBuilder::createDescriptorSetLayout(VkDescriptorSetLayoutCreateInfo& layoutInfo)
+{
+	return pLayoutCache->createDescriptorSetLayout(layoutInfo);
+}
+
+VkDescriptorSetLayout DescriptorBuilder::createDescriptorSetLayout(const VkDescriptorSetLayoutBinding* bindings, uint32_t bindingCount)
+{
+	return pLayoutCache->createDescriptorSetLayout(bindings, bindingCount);
 }
 
 const PoolManager& DescriptorBuilder::getPoolManager() const

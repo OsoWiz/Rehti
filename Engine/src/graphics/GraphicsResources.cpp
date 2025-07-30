@@ -1,7 +1,11 @@
-#define VMA_IMPLEMENTATION
-#include "GraphicsResources.h"
+#include "GraphicsResources.hpp"
 
-RehtiGraphics::Buffer RehtiGraphics::createBuffer(VmaAllocator& allocator, VkDeviceSize size, VkBufferUsageFlags flags)
+#define VMA_IMPLEMENTATION
+#include <vulkan/vulkan.h>
+#include <vma/vk_mem_alloc.h>
+
+
+Buffer createBuffer(VmaAllocator& allocator, VkDeviceSize size, VkBufferUsageFlags flags)
 {
 	Buffer newBuffer{};
 	VkBufferCreateInfo bufferInfo{};
@@ -16,7 +20,7 @@ RehtiGraphics::Buffer RehtiGraphics::createBuffer(VmaAllocator& allocator, VkDev
 	return newBuffer;
 }
 
-RehtiGraphics::Image RehtiGraphics::createImage(VmaAllocator& allocator, uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags flags)
+Image createImage(VmaAllocator& allocator, uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags flags)
 {
 	Image newImage{};
 	VkImageCreateInfo imageInfo{};

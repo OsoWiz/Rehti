@@ -1,11 +1,14 @@
-#include "GraphicsTypes.h"
+#include "GraphicsTypes.hpp"
 
-#include <glm/ext.hpp>
-#include <glm/ext/quaternion_common.hpp>
+#include <vulkan/vulkan.hpp>
+#include "BasicAttributes.hpp"
 
 
-void CharacterData::advanceAnimation(float dt, Animation& animation)
+void CharacterData::advanceAnimation(float dt)
 {
+	// todo perhaps this should fill up a list of transformations. The current bone transformations list is a bit hacky.
+	// that way stuff like IK could be just plugged in.
+	Animation animation = animationData.animations[animationData.currentAnimationIndex];
 	// If no animation is set, do nothing.
 	if (animation.animationNodes.empty())
 		return;
@@ -28,25 +31,25 @@ void CharacterData::advanceAnimation(float dt, Animation& animation)
 
 	double factor = (trueAnimationtime - firstNode.time) / timeDiff;
 
-	size_t bonesToUpdate = bones.size();
+	size_t bonesToUpdate = skeleton.bones.size();
 	uint32_t boneIndex = 0; // The root bone is always the first bone in the array.
 	while (0 < bonesToUpdate)
 	{
-		BoneNode bone = bones[boneIndex];
+		BoneNode bone = skeleton.bones[boneIndex];
 		glm::mat4 parentTransformation = glm::mat4(1.0f);
 		if (-1 < bone.parent) // we assume parents are always updated before children
-			parentTransformation = boneTransformations[bone.parent];
+			parentTransformation = skeleton.boneTransformations[bone.parent];
 
 		glm::mat4 interPolatedTransformation = Pose::interpolate(firstNode.bones[boneIndex], secondNode.bones[boneIndex], factor).getTransformationMatrix();
-		boneTransformations[boneIndex] = parentTransformation * interPolatedTransformation;
+		skeleton.boneTransformations[boneIndex] = parentTransformation * interPolatedTransformation;
 
 		boneIndex++;
 		bonesToUpdate--;
 	}
 	// TODO make this more efficient
-	for (size_t i = 0; i < bones.size(); i++)
+	for (size_t i = 0; i < skeleton.bones.size(); i++)
 	{
-		boneTransformations[i] = inverseGlobalTransformation * boneTransformations[i] * bones[i].boneOffset;
+		skeleton.boneTransformations[i] = inverseGlobalTransformation * skeleton.boneTransformations[i] * skeleton.bones[i].boneOffset;
 	}
 }
 

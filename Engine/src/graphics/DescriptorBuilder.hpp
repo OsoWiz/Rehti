@@ -1,10 +1,13 @@
 #pragma once
+
+#include <algorithm>
+#include <functional>
+#include <stdexcept>
 #include <vulkan/vulkan.h>
 
 #include <memory>
 #include <unordered_map>
 #include <vector>
-
 // Chunk size for descriptor pool allocations
 constexpr VkDeviceSize POOL_CHUNK_SIZE = 256;
 
@@ -128,7 +131,7 @@ private:
 class DescriptorBuilder
 {
 public:
-	DescriptorBuilder(PoolManager& poolManager, DescriptorSetLayoutCache& cache);
+	DescriptorBuilder(VkDevice device);
 	~DescriptorBuilder();
 
 	/// <summary>
@@ -195,6 +198,23 @@ public:
 	/// <param name="bindings"> to be used</param>
 	void setDescriptorSetLayout(const VkDescriptorSetLayoutBinding* bindings, uint32_t bindingCount,
 		VkDescriptorSetLayout& layout);
+
+
+	/// <summary>
+	/// Creates a descriptor set layout using builders layoutCache member.
+	/// </summary>
+	/// <param name="layoutInfo">Layout info</param>
+	/// <returns>Allocated descriptor set layout</returns>
+	VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutCreateInfo& layoutInfo);
+
+	/// <summary>
+	/// Creates a descriptor set layout using builders layoutCache member
+	/// </summary>
+	/// <param name="bindings"> to create a layout of.</param>
+	/// <param name="bindingCount"> of the bindings.</param>
+	/// <returns>Created layout.</returns>
+	VkDescriptorSetLayout createDescriptorSetLayout(const VkDescriptorSetLayoutBinding* bindings,
+		uint32_t bindingCount);
 
 	const PoolManager& getPoolManager() const;
 

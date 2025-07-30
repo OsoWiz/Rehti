@@ -1,6 +1,34 @@
-#include "Camera.h"
+#include <Camera.hpp>
 
 #include <iostream>
+#include <functional>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_access.hpp>
+
+// Forward declarations
+struct GLFWwindow;
+
+// TODO figure out how camera should function with the player target.
+struct Target
+{
+	glm::vec3 pos;
+};
+// standard cartesian coordinate system
+constexpr glm::vec3 POSITIVE_X_AXIS(1.f, 0.f, 0.f);
+constexpr glm::vec3 POSITIVE_Y_AXIS(0.f, 1.f, 0.f);
+constexpr glm::vec3 POSITIVE_Z_AXIS(0.f, 0.f, 1.f);
+
+constexpr float STANDARD_ZOOM(12.f); // zoom used in the constructor. 10 Units away from the target
+constexpr float MIN_ZOOM(2.f);       // minimum zoom
+constexpr float MAX_ZOOM(25.f);      // maximum zoom
+
+/**
+ * @ brief Camera class that enables orbiting around a target.
+ *		This class allows querying for view and projection matrices or a combination of both.
+ */
+
+
+
 constexpr float heightOffset = 1.5f;
 double Camera::mouseX = 0;
 double Camera::mouseY = 0;
@@ -9,12 +37,12 @@ bool Camera::canMove = false;
 Camera::Camera(glm::vec3 targetPos, float width, float height, float fovRad, float near, float far, float sensitivity)
 	: target(targetPos.x, targetPos.y + heightOffset, targetPos.z), cameraMatrix(1.f) // identity
 	,
-	sensitivity(sensitivity), zoom(STANDARD_ZOOM), zoomSensitivity(50.f * sensitivity), width(width), height(height)
+	sensitivity(sensitivity), currentZoom(STANDARD_ZOOM), zoomSensitivity(50.f * sensitivity), width(width), height(height)
 {
 
 	projectionMatrix = glm::perspective(fovRad, width / height, near, far);
 	projectionMatrix[1][1] *= -1; // flip y axis
-	moveLocation(target - getForward() * zoom);
+	moveLocation(target - getForward() * currentZoom);
 	orbitRotate(glm::vec2(0.f, 2.f));
 }
 
@@ -79,11 +107,11 @@ void Camera::orbitRotate(glm::vec2 rotationVec)
 
 void Camera::zoom(float zoomAmount)
 {
-	float newZoom = zoom + zoomAmount * zoomSensitivity;
+	float newZoom = currentZoom + zoomAmount * zoomSensitivity;
 	// clamp zoom
 	newZoom = glm::min(newZoom, MAX_ZOOM);
-	zoom = glm::max(newZoom, MIN_ZOOM);
-	setLocation(target - getForward() * zoom);
+	currentZoom = glm::max(newZoom, MIN_ZOOM);
+	setLocation(target - getForward() * currentZoom);
 }
 
 void Camera::setSensitivity(float newSensitivity, float newZoomSens)

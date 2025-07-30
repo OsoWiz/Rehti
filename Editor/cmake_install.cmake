@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/otsol/Documents/Visual Studio 2022/source/repos/Rehti/editor
+# Install script for directory: C:/Users/otsol/source/repos/Rehti/editor
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

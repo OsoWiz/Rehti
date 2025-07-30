@@ -28,8 +28,8 @@ find_package(VulkanHeaders CONFIG REQUIRED)
 find_package(VulkanLoader CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(SPIRV-Tools CONFIG REQUIRED)
-find_package(SDL2 CONFIG REQUIRED)
-find_package(SDL2_IMAGE CONFIG REQUIRED)
+find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_IMAGE CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(jsoncpp CONFIG)
 find_package(glslang CONFIG REQUIRED)
@@ -38,11 +38,11 @@ find_package(imgui CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 
 # Add source to this project's executable.
-add_subdirectory(Engine)
-add_subdirectory(Editor)
+add_subdirectory(engine)
+add_subdirectory(editor)
 
 # TODO: Add tests and install targets if needed.
 
 if(BUILD_TESTS)
-  add_subdirectory(Tests)
+  add_subdirectory(tests)
 endif()

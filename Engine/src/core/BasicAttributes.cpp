@@ -1,12 +1,12 @@
-#include "BasicAttributes.h"
+#include "BasicAttributes.hpp"
 
 glm::mat4 Pose::getTransformationMatrix() const
 {
 	glm::mat4 transformation = glm::mat4(1.0f);
 
-	glm::mat4 scalingMat = glm::scale(glm::mat4(1.0f), scale);
-	glm::mat4 rotatMat = glm::mat4(orientation);
-	glm::mat4 translMat = glm::translate(glm::mat4(1.0f), position);
+	glm::mat4 scalingMat = glm::scale(glm::mat4(1.0f), scale.value);
+	glm::mat4 rotatMat = orientation.toMat4();
+	glm::mat4 translMat = glm::translate(glm::mat4(1.0f), position.value);
 	transformation = translMat * rotatMat * scalingMat;
 	return transformation;
 }
@@ -18,6 +18,6 @@ Pose Pose::interpolate(Pose first, Pose second, float factor)
 	float inverseWeight = 1.f - normalizedTimeClamped;
 	interpolatedNode.position = first.position * inverseWeight + second.position * normalizedTimeClamped;
 	interpolatedNode.scale = first.scale * inverseWeight + second.scale * normalizedTimeClamped;
-	interpolatedNode.orientation = glm::slerp(first.orientation, second.orientation, normalizedTimeClamped);
+	interpolatedNode.orientation = glm::slerp(first.orientation.value, second.orientation.value, normalizedTimeClamped);
 	return interpolatedNode;
 }

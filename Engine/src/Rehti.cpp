@@ -1,5 +1,5 @@
-#include <Rehti.h>
-#include "Rehtigraphics.h"
+#include "Rehti.hpp"
+#include "RehtiGraphics.hpp"
 
 int initialize()
 {
@@ -7,6 +7,11 @@ int initialize()
 	settings.windowCapability = true;
 	settings.windowTitle = "Rehti";
 	initializeGraphics(settings);
-	cleanupGraphics();
 	return 0;
+}
+
+
+void cleanup()
+{
+	cleanupGraphics();
 }

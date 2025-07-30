@@ -1,4 +1,4 @@
-#include "RehtiAlloc.h"
+#include "RehtiAlloc.hpp"
 
 StackAllocator::StackAllocator(size_t size)
 {

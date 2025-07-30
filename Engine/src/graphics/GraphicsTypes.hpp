@@ -1,9 +1,12 @@
 #pragma once
-#include <vulkan/vulkan.hpp>
-#include "src/core/BasicAttributes.h"
+
+#include <vulkan/vulkan.h>
+#include <array>
+#include <vector>
+#include "BasicAttributes.hpp"
 
 constexpr size_t MAX_BONES = 50;
-constexpr size_t MAX_ANIMATIONS = 10;
+constexpr size_t MAX_ANIMATIONS = 10; // Redo with component system?
 
 struct IndexedDrawable
 {
@@ -20,11 +23,13 @@ struct TriangleFanDrawable
 	VkDescriptorSet descriptorSet;
 };
 
-
+/**
+ * @brief Animation node represents a pose of a complete character as a combination of poses of its individual bones at a certain time.
+ */
 struct AnimationNode
 {
 	double time;                                 ///< time of this animation node in ticks
-	std::array<Pose, MAX_BONES> bones; ///< bone orientations
+	std::array<Pose, MAX_BONES> bones;			 ///< bone orientations
 };
 
 /**
@@ -52,12 +57,17 @@ struct BoneNode
 	std::vector<uint32_t> children; ///< indices of the children in bone array.
 };
 
+struct Skeleton
+{
+	std::vector<glm::mat4> boneTransformations;
+	const std::vector<BoneNode> bones;
+};
+
 struct CharacterData
 {
-	Pose characterOrientation;                    ///< orientation of the character
-	glm::mat4 inverseGlobalTransformation;                  ///< inverse global transformation of the character
-	std::array<glm::mat4, MAX_BONES> boneTransformations{}; ///< bone transformation storage data
-	std::vector<BoneNode> bones;
-	CharacterAnimationData animationData;
-	void advanceAnimation(float dt);
+	Pose characterOrientation;						///< orientation of the character
+	glm::mat4 inverseGlobalTransformation;			///< inverse global transformation of the character
+	Skeleton skeleton;								///< skeleton of the character
+	CharacterAnimationData animationData;			///< animation data of the character
+	void advanceAnimation(float dt);				///< advances the current animation of the character
 };
