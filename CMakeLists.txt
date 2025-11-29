@@ -36,12 +36,12 @@ find_package(glslang CONFIG REQUIRED)
 find_package(unofficial-shaderc CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
+find_package(flecs CONFIG REQUIRED)
 
 # Add source to this project's executable.
 add_subdirectory(engine)
 add_subdirectory(editor)
 
-# TODO: Add tests and install targets if needed.
 
 if(BUILD_TESTS)
   add_subdirectory(tests)

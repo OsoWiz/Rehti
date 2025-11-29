@@ -2,13 +2,13 @@
 
 #include <iostream>
 
-int initializeGraphics(const GraphicsSettings& graphicsSettings)
+int RehtiGraphics::initialize(const Configuration& config)
 {
 	std::cout << "Initializing.." << std::endl;
 	return 0;
 }
 
-int cleanupGraphics()
+int cleanup()
 {
 	std::cout << "Cleaning up.." << std::endl;
 	return 0;

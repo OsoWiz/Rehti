@@ -3,6 +3,6 @@
 int main()
 {
 	std::cout << "Hello, RehtiEditor!" << std::endl;
-	initialize();
+	Rehti::initializeRehti();
 	return 0;
 }

@@ -1,5 +1,26 @@
 #pragma once
+#include <memory>
 
-int initialize();
+#include <Configuration.hpp>
 
-void cleanup();
+class Rehti
+{
+public:
+
+	static int initializeRehti(const Configuration& configuration);
+	static int initializeRehti();
+
+	static void cleanupRehti();
+
+	Rehti(Rehti& other) = delete;
+	Rehti& operator=(const Rehti&) = delete;
+
+
+	void eventLoop();
+
+private:
+	class RehtiImpl;
+	friend class RehtiImpl;
+	Rehti();
+	static std::unique_ptr<RehtiImpl> instance;
+};

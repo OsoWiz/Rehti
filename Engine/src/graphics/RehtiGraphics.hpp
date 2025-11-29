@@ -2,28 +2,23 @@
 
 #include <string>
 #include <VulkanBackend.hpp>
+#include <EngineSubsystem.hpp>
 
-// FWD declarations
-class VulkanBackend;
+class Configuration;
 
-// actual decl
-struct GraphicsSettings
-{
-	std::string windowTitle = "Rehti engine";
-	uint32_t concurrentFrames = 2;
-	bool windowCapability = true; // whether graphical output is desired
-	bool dynamicVertexInput = false; // Used when the vertex input should be dynamic and specified at draw time
-};
-
-class RehtiGraphics
+class RehtiGraphics : public EngineSubsystem<RehtiGraphics>
 {
 
 public:
-	static int initialize(const GraphicsSettings& graphicsSettings);
+	static RehtiGraphics* getInstance() { return instance; }
+
+	static int initialize(const Configuration& config);
 
 	static int cleanup();
 
 private:
+	inline static RehtiGraphics* instance = nullptr; // Singleton instance
+
 	RehtiGraphics() = default;
 	RehtiGraphics(const RehtiGraphics&) = delete;
 	RehtiGraphics& operator=(const RehtiGraphics&) = delete;

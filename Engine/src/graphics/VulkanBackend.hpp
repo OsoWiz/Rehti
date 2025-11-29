@@ -8,9 +8,18 @@
 struct SDL_Window;
 struct Image;
 
-// decl
-
+// constants
 constexpr uint32_t REQUIRED_VULKAN_VERSION = VK_API_VERSION_1_3;
+
+
+// decl
+struct GraphicsSettings
+{
+	std::string windowTitle = "Rehti engine";
+	uint32_t concurrentFrames = 2;
+	bool windowCapability = true; // whether graphical output is desired
+	bool dynamicVertexInput = false; // Used when the vertex input should be dynamic and specified at draw time
+};
 
 enum class VulkanBackendFlags : uint16_t
 {
