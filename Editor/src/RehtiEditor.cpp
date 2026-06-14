@@ -1,8 +1,8 @@
 #include <iostream>
-#include <Rehti.hpp>
+#include <RehtiEngine.hpp>
 int main()
 {
 	std::cout << "Hello, RehtiEditor!" << std::endl;
-	Rehti::initializeRehti();
+	RehtiEngine::initializeRehti();
 	return 0;
 }

@@ -4,6 +4,18 @@ find_package(GTest CONFIG REQUIRED)
 
 set(TEST_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/RehtiTests.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoaderTests.cpp
+)
+
+include_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}
+	${REHTI_INCLUDE_DIR}
+	${CORE_SOURCE_DIR}
+	${GRAPHICS_SOURCE_DIR}
+	${PHYSICS_SOURCE_DIR}
+	${AUDIO_SOURCE_DIR}
+	${INPUT_SOURCE_DIR}
+	${NETWORKING_SOURCE_DIR}
 )
 
 add_executable(

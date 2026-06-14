@@ -1,10 +1,12 @@
 #include "PipelineManager.hpp"
+#include "Logger.hpp"
+#include "GraphicsUtils.hpp"
 
-std::vector<VkVertexInputAttributeDescription> PipelineShaderInfo::getVertexAttributes(uint32_t binding) const
+std::vector<VkVertexInputAttributeDescription> PipelineShaderData::getVertexAttributes(uint32_t binding) const
 {
 	if (!vertexShaderData.has_value())
 	{
-		std::cerr << "Error: No vertex shader currently set!" << std::endl;
+		Logger::warning("No data in vertex shader");
 		return {};
 	}
 
@@ -26,35 +28,66 @@ std::vector<VkVertexInputAttributeDescription> PipelineShaderInfo::getVertexAttr
 	return result;
 }
 
-std::vector<VkDescriptorSetLayout> PipelineShaderInfo::getDescriptorSetLayouts() const
+std::vector<VkDescriptorSetLayout> PipelineShaderData::getDescriptorSetLayouts() const 
 {
-	std::vector<VkDescriptorSetLayout> layouts;
-	auto pushBack = [&layouts](VkDescriptorSetLayout layout) { layouts.push_back(layout); };
-	if (vertexShaderData.has_value())
+	std::array<VkDescriptorSetLayout, MAX_DESCRIPTOR_SETS> merged{};
+	merged.fill(VK_NULL_HANDLE);
+
+	auto mergeStageLayouts = [&merged](const std::optional<CompiledShaderData>& stage)
+		{
+			if (!stage.has_value())
+				return;
+
+			for (size_t set = 0; set < stage->descriptorSetLayouts.size(); ++set)
+			{
+				const VkDescriptorSetLayout layout = stage->descriptorSetLayouts[set];
+				if (layout == VK_NULL_HANDLE)
+					continue;
+
+				if (merged[set] == VK_NULL_HANDLE)
+				{
+					merged[set] = layout;
+				}
+				else if (merged[set] != layout)
+				{
+					Logger::warning("Descriptor set layout mismatch across shader stages at set " + std::to_string(set));
+				}
+			}
+		};
+
+	mergeStageLayouts(vertexShaderData);
+	mergeStageLayouts(tessControlShaderData);
+	mergeStageLayouts(tessEvalShaderData);
+	mergeStageLayouts(geometryShaderData);
+	mergeStageLayouts(fragmentShaderData);
+
+	size_t highestUsedSet = 0;
+	bool hasAny = false;
+	for (size_t i = 0; i < merged.size(); ++i)
 	{
-		std::for_each(vertexShaderData->descriptorSetLayouts.begin(), vertexShaderData->descriptorSetLayouts.end(), pushBack);
-	}
-	if (tessControlShaderData.has_value())
-	{
-		std::for_each(tessControlShaderData->descriptorSetLayouts.begin(), tessControlShaderData->descriptorSetLayouts.end(), pushBack);
-	}
-	if (tessEvalShaderData.has_value())
-	{
-		std::for_each(tessEvalShaderData->descriptorSetLayouts.begin(), tessEvalShaderData->descriptorSetLayouts.end(), pushBack);
-	}
-	if (geometryShaderData.has_value())
-	{
-		std::for_each(geometryShaderData->descriptorSetLayouts.begin(), geometryShaderData->descriptorSetLayouts.end(), pushBack);
-	}
-	if (fragmentShaderData.has_value())
-	{
-		std::for_each(fragmentShaderData->descriptorSetLayouts.begin(), fragmentShaderData->descriptorSetLayouts.end(), pushBack);
+		if (merged[i] != VK_NULL_HANDLE)
+		{
+			hasAny = true;
+			highestUsedSet = i;
+		}
 	}
 
-	return layouts;
+	if (!hasAny)
+		return {};
+
+	for (size_t i = 0; i <= highestUsedSet; ++i)
+	{
+		if (merged[i] == VK_NULL_HANDLE)
+		{
+			Logger::warning("Descriptor set layout gap detected before highest used set");
+			return {};
+		}
+	}
+
+	return std::vector<VkDescriptorSetLayout>(merged.begin(), merged.begin() + highestUsedSet + 1);
 }
 
-std::vector<VkPushConstantRange> PipelineShaderInfo::getPushConstantRanges() const
+std::vector<VkPushConstantRange> PipelineShaderData::getPushConstantRanges() const
 {
 	std::vector<VkPushConstantRange> ranges;
 
@@ -104,7 +137,7 @@ std::vector<VkPushConstantRange> PipelineShaderInfo::getPushConstantRanges() con
 	return ranges;
 }
 
-std::vector<VkPipelineShaderStageCreateInfo> PipelineShaderInfo::getShaderStageInfos() const
+std::vector<VkPipelineShaderStageCreateInfo> PipelineShaderData::getShaderStageInfos() const
 {
 	std::vector<VkPipelineShaderStageCreateInfo> stages;
 	if (vertexShaderData.has_value())
@@ -131,7 +164,7 @@ std::vector<VkPipelineShaderStageCreateInfo> PipelineShaderInfo::getShaderStageI
 	return stages;
 }
 
-uint32_t PipelineShaderInfo::getStride() const
+uint32_t PipelineShaderData::getStride() const
 {
 	if (!vertexShaderData.has_value())
 	{
@@ -147,58 +180,67 @@ uint32_t PipelineShaderInfo::getStride() const
 	return stride;
 }
 
-VertexAttributeFlags PipelineShaderInfo::getAttributes() const
+VertexAttributeFlags PipelineShaderData::getAttributes() const
 {
 	if (!vertexShaderData.has_value())
 	{
 		std::cerr << "Error: No vertex shader currently set!" << std::endl;
 		return {};
 	}
-	uint16_t flags = 0;
+	VertexAttributeFlags flags = VertexAttributeFlags::NONE;
 	for (const auto& [attribute, format] : vertexShaderData.value().inputAttributes)
 	{
-		flags |= static_cast<uint16_t>(1 << attribute);
+		flags |= attribute;
 	}
-	return static_cast<VertexAttributeFlags>(flags);
+	return flags;
 }
 
-PipelineManager::PipelineManager(VkDevice& logDevice, VkExtent2D& currentExtent)
-	: logDevice(logDevice), swapChainExtent(currentExtent)
+PipelineManager::PipelineManager(VkDevice& logDevice)
+	: logDevice(logDevice)
 {
 }
 
-void PipelineManager::createBasicPipeline(const VkRenderPass& renderPass, const CompiledShaderData& vShaderData, const CompiledShaderData& fShaderData)
+PipelineManager::~PipelineManager()
 {
-	PipelineShaderInfo shaderInfo{};
-	shaderInfo.vertexShaderData = vShaderData;
-	shaderInfo.fragmentShaderData = fShaderData;
-	createPipeline(renderPass, shaderInfo);
-}
-
-void PipelineManager::createPipeline(const VkRenderPass& renderPass, const PipelineShaderInfo& compiledShaders)
-{
-	if (!compiledShaders.isComplete())
+	for (const auto& pipelinedata : pipelines)
 	{
-		std::cerr << "PipelineShaderInfo is missing vertex or fragment shader:\n";
-		if (!compiledShaders.vertexShaderData.has_value())
-			std::cerr << " Vertex shader missing\n";
-		if (!compiledShaders.fragmentShaderData.has_value())
-			std::cerr << " Fragment shader missing\n";
-		std::cerr << std::endl;
-		return;
+		vkDestroyPipeline(logDevice, pipelinedata.pipeline, nullptr);
 	}
+}
 
-	VkVertexInputBindingDescription bindingDesc{};
-	bindingDesc.binding = 0;
-	bindingDesc.stride = compiledShaders.getStride();
-	bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+CompiledPipelineData PipelineManager::createPipeline(const PipelineShaderData& pipelineShaders, const GraphicsPipelineConfig& config, const PipelineCreationDetails& details)
+{
+	CompiledPipelineData compiledPipeline{};
 
-	std::vector<VkVertexInputAttributeDescription> attributeDescs = compiledShaders.getVertexAttributes(bindingDesc.binding);
+	std::vector<VkVertexInputAttributeDescription> attributeDescs = Mapping::getVertexAttributeDescriptions(config.vertexShader, 0);
+	std::vector<VkVertexInputBindingDescription> bindingDescs{};
+	if (details.interleavedVertexData)
+	{
+		VkVertexInputBindingDescription bindingDesc{};
+		bindingDesc.binding = 0;
+		bindingDesc.stride = pipelineShaders.getStride();
+		bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		bindingDescs.push_back(bindingDesc);
+	}
+	else
+	{
+		uint32_t binding = 0;
+		for (const auto& attribute : attributeDescs)
+		{
+			VkVertexInputBindingDescription bindingDesc{};
+			bindingDesc.binding = binding;
+			VertexAttributeInfo info = getAttributeInfo(attribute.format);
+			bindingDesc.stride = info.size;
+			bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			bindingDescs.push_back(bindingDesc);
+			binding++;
+		}
+	}
 
 	VkPipelineVertexInputStateCreateInfo vertInputInfo{};
 	vertInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertInputInfo.vertexBindingDescriptionCount = 1;
-	vertInputInfo.pVertexBindingDescriptions = &bindingDesc;
+	vertInputInfo.vertexBindingDescriptionCount = bindingDescs.size();
+	vertInputInfo.pVertexBindingDescriptions = bindingDescs.data();
 	vertInputInfo.vertexAttributeDescriptionCount = attributeDescs.size();
 	vertInputInfo.pVertexAttributeDescriptions = attributeDescs.data();
 
@@ -207,33 +249,26 @@ void PipelineManager::createPipeline(const VkRenderPass& renderPass, const Pipel
 	inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
-	VkViewport viewPort{};
-	viewPort.x = 0.f;
-	viewPort.y = 0.f;
-	viewPort.width = swapChainExtent.width;
-	viewPort.height = swapChainExtent.height;
-	viewPort.minDepth = 0.f;
-	viewPort.maxDepth = 1.f;
-
-	VkRect2D scissor{};
-	scissor.offset = { 0, 0 };
-	scissor.extent = swapChainExtent;
+	std::vector<VkDynamicState> dynamicStates = { // always include at least viewport and scissor as dynamic states
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
 
 	VkPipelineViewportStateCreateInfo viewportInfo{};
 	viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportInfo.viewportCount = 1;
-	viewportInfo.pViewports = &viewPort;
+	viewportInfo.pViewports = nullptr;
 	viewportInfo.scissorCount = 1;
-	viewportInfo.pScissors = &scissor;
+	viewportInfo.pScissors = nullptr;
 
 	VkPipelineRasterizationStateCreateInfo rasterInfo{};
 	rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterInfo.depthClampEnable = VK_FALSE;
 	rasterInfo.rasterizerDiscardEnable = VK_FALSE;
-	rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterInfo.polygonMode = Mapping::toVkType(config.rasterizationConfig.polygonFillMode);
 	rasterInfo.lineWidth = 1.0f;
-	rasterInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterInfo.frontFace = VK_FRONT_FACE_CLOCKWISE; // This is because y is flipped in perspective matrix
+	rasterInfo.cullMode = Mapping::toVkType(config.rasterizationConfig.cullMode);
+	rasterInfo.frontFace = Mapping::toVkType(config.rasterizationConfig.frontFace); // This is because y is flipped in perspective matrix
 	rasterInfo.depthBiasEnable = VK_FALSE;
 	rasterInfo.depthBiasConstantFactor = 0.f;
 	rasterInfo.depthBiasClamp = 0.f;
@@ -267,10 +302,10 @@ void PipelineManager::createPipeline(const VkRenderPass& renderPass, const Pipel
 	// Layout info for literally only push constants and descriptor sets
 	VkPipelineLayoutCreateInfo pipelinelayoutInfo{};
 	pipelinelayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	std::vector<VkDescriptorSetLayout> descLayouts = compiledShaders.getDescriptorSetLayouts();
+	std::vector<VkDescriptorSetLayout> descLayouts = pipelineShaders.getDescriptorSetLayouts();
 	pipelinelayoutInfo.setLayoutCount = static_cast<uint32_t>(descLayouts.size());
 	pipelinelayoutInfo.pSetLayouts = descLayouts.data();
-	std::vector<VkPushConstantRange> pushConstants = compiledShaders.getPushConstantRanges();
+	std::vector<VkPushConstantRange> pushConstants = pipelineShaders.getPushConstantRanges();
 	pipelinelayoutInfo.pushConstantRangeCount = pushConstants.size();
 	pipelinelayoutInfo.pPushConstantRanges = pushConstants.data();
 
@@ -281,25 +316,37 @@ void PipelineManager::createPipeline(const VkRenderPass& renderPass, const Pipel
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
 	depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencilInfo.depthTestEnable = VK_TRUE;
+	depthStencilInfo.depthTestEnable = static_cast<VkBool32>(config.depthStencilConfig.depthTestEnable);
 	depthStencilInfo.depthWriteEnable = VK_TRUE;
-	depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+	depthStencilInfo.depthCompareOp = static_cast<VkCompareOp>(config.depthStencilConfig.depthCompareOp); // this is sus but should work.
 	depthStencilInfo.depthBoundsTestEnable = VK_FALSE;
-	depthStencilInfo.minDepthBounds = 0.f; // Optional
-	depthStencilInfo.maxDepthBounds = 1.f;
-	depthStencilInfo.stencilTestEnable = VK_FALSE; // no stencil test
-	depthStencilInfo.front = {};                   // Optional
+	depthStencilInfo.minDepthBounds = config.depthStencilConfig.depthBounds.first;
+	depthStencilInfo.maxDepthBounds = config.depthStencilConfig.depthBounds.second;
+	depthStencilInfo.stencilTestEnable = static_cast<VkBool32>(config.depthStencilConfig.stencilTestEnable);
+	depthStencilInfo.front = {};
 	depthStencilInfo.back = {};
+
+	VkPipelineRenderingCreateInfo pipeline_create{ VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+	pipeline_create.pNext = VK_NULL_HANDLE;
+	pipeline_create.colorAttachmentCount = static_cast<uint32_t>(details.colorAttachmentFormats.size());
+	pipeline_create.pColorAttachmentFormats = details.colorAttachmentFormats.data();
+	pipeline_create.depthAttachmentFormat = details.depthAttachmentFormat;
+	pipeline_create.stencilAttachmentFormat = details.stencilAttachmentFormat;
+
+	VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
+	dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+	dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-
-	std::vector<VkPipelineShaderStageCreateInfo> shaderStages = compiledShaders.getShaderStageInfos();
+	pipelineInfo.pNext = &pipeline_create;
+	std::vector<VkPipelineShaderStageCreateInfo> shaderStages = pipelineShaders.getShaderStageInfos();
 	pipelineInfo.stageCount = shaderStages.size();
 	pipelineInfo.pStages = shaderStages.data();
 
 	pipelineInfo.pVertexInputState = &vertInputInfo;
-	pipelineInfo.pDynamicState = nullptr; // Optional
+	pipelineInfo.pDynamicState = &dynamicStateInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
 	pipelineInfo.pViewportState = &viewportInfo;
 	pipelineInfo.pRasterizationState = &rasterInfo;
@@ -307,21 +354,34 @@ void PipelineManager::createPipeline(const VkRenderPass& renderPass, const Pipel
 	pipelineInfo.pColorBlendState = &colorBlendInfo;
 	pipelineInfo.pDepthStencilState = &depthStencilInfo;
 	pipelineInfo.layout = newLayout;
-	pipelineInfo.renderPass = renderPass;
+	pipelineInfo.renderPass = VK_NULL_HANDLE;
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 	pipelineInfo.basePipelineIndex = -1;
 
 	// Create the actual pipeline
 	VkPipeline newPipeline;
-	if (vkCreateGraphicsPipelines(logDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS)
+    if (vkCreateGraphicsPipelines(logDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS)
 		throw std::runtime_error("Pipeline layout creation failed");
 
 	// Add the pipeline to the map
-	this->pipelines[compiledShaders.getAttributes()] = newPipeline;
+	this->pipelines.push_back(compiledPipeline);
+	compiledPipeline.vertexAttributes = pipelineShaders.getAttributes();
+	compiledPipeline.pipeline = newPipeline;
+	compiledPipeline.descriptorSetLayouts = descLayouts;
+	compiledPipeline.pushConstantRanges = pipelineShaders.getPushConstantRanges();
+	return compiledPipeline;
 }
 
-VkPipeline PipelineManager::getPipeline(VertexAttributeFlags attributes)
+std::optional<CompiledPipelineData> PipelineManager::findPipeline(VertexAttributeFlags attributes)
 {
-	return this->pipelines[attributes];
+	auto it = std::find_if(pipelines.begin(), pipelines.end(), [attributes](const auto& pipelineData)
+		{
+			return pipelineData.vertexAttributes == attributes;
+		});
+	if (it != pipelines.end())
+	{
+		return *it;
+	}
+	return std::nullopt;
 }

@@ -23,7 +23,8 @@
 		"sdl3-image",
 		"assimp",
 		"flecs",
-		"gtest"
+		"gtest",
+		"boost"
 	]
 
 }

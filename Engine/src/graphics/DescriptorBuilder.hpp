@@ -24,54 +24,61 @@ const std::vector<VkDescriptorPoolSize> STANDARD_POOL_SIZES({ {VK_DESCRIPTOR_TYP
 															 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
 															 {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000} });
 
-/// <summary>
-/// This class manages descriptor pools, and allows for the allocation of descriptor sets.
-/// </summary>
+/**
+*
+* This class manages descriptor pools, and allows for the allocation of descriptor sets.
+*/
 class PoolManager
 {
 public:
 	PoolManager(VkDevice device);
 	~PoolManager();
 
-	/// <summary>
-	/// Resets pools
-	/// </summary>
+   /**
+	*
+	* Resets pools
+	*/
 	void resetPools();
 
-	/// <summary>
-	/// Allocates a descriptor set from the pool
-	/// </summary>
-	/// <param name="layout">Layout to be used</param>
-	/// <param name="descSet">Descriptor set to be allocated</param>
-	/// <returns></returns>
+   /**
+	*
+	* Allocates a descriptor set from the pool
+	* @param layout Layout to be used
+	* @param descSet Descriptor set to be allocated
+	* @return
+	*/
 	bool allocateDescriptorSet(VkDescriptorSetLayout layout, VkDescriptorSet& descSet);
 
-	/// <summary>
-	/// Allocates a descriptor pool and adds it to the free pools.
-	/// </summary>
-	/// <param name="device">logical device</param>
-	/// <param name="flags">flags</param>
-	/// <param name="maxSets">maximum number of sets to be allocated from this pool</param>
-	/// <param name="poolSizes">List of limits on individual descriptors that can be allocated from this pool. For
-	/// example 2 uniform buffers or 3 images.</param> <returns></returns>
+   /**
+	*
+	* Allocates a descriptor pool and adds it to the free pools.
+	* @param device logical device
+	* @param flags flags
+	* @param maxSets maximum number of sets to be allocated from this pool
+	* @param poolSizes List of limits on individual descriptors that can be allocated from this pool. For
+	* example 2 uniform buffers or 3 images.
+	* @return
+	*/
 	VkDescriptorPool createPool(VkDevice device, VkDescriptorPoolCreateFlags flags, uint32_t maxSets,
 		const std::vector<VkDescriptorPoolSize>& poolSizes);
 
-	/// <summary>
-	/// Returns the logical device used by this manager.
-	/// </summary>
-	/// <returns></returns>
+   /**
+	*
+	* Returns the logical device used by this manager.
+	* @return
+	*/
 	VkDevice getDevice() const
 	{
 		return logDevice;
 	}
 
 private:
-	/// <summary>
-	/// Returns a pool from free pools or creates a new one.
-	/// Does not push the returned pool to used pools.
-	/// </summary>
-	/// <returns></returns>
+   /**
+	*
+	* Returns a pool from free pools or creates a new one.
+	* Does not push the returned pool to used pools.
+	* @return
+	*/
 	VkDescriptorPool grabPool();
 
 	VkDevice logDevice;
@@ -80,28 +87,31 @@ private:
 	std::vector<VkDescriptorPool> usedPools;
 };
 
-/// <summary>
-/// The use of this class is to cache descriptor set layouts.
-/// </summary>
+/**
+*
+* The use of this class is to cache descriptor set layouts.
+*/
 class DescriptorSetLayoutCache
 {
 public:
 	DescriptorSetLayoutCache(VkDevice device);
 	~DescriptorSetLayoutCache();
 
-	/// <summary>
-	/// Creates a descriptor set layout from the given info, or returns one from the cache if it already exists.
-	/// </summary>
-	/// <param name="layoutInfo">Layout info</param>
-	/// <returns>Allocated descriptor set layout</returns>
+   /**
+	*
+	* Creates a descriptor set layout from the given info, or returns one from the cache if it already exists.
+	* @param layoutInfo Layout info
+	* @return Allocated descriptor set layout
+	*/
 	VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutCreateInfo& layoutInfo);
 
-	/// <summary>
-	/// Creates a descriptor set layout from the given bindings, or returns one from the cache if it already exists.
-	/// </summary>
-	/// <param name="bindings"> to create a layout of.</param>
-	/// <param name="bindingCount"> of the bindings.</param>
-	/// <returns>Created layout.</returns>
+   /**
+	*
+	* Creates a descriptor set layout from the given bindings, or returns one from the cache if it already exists.
+	* @param bindings to create a layout of.
+	* @param bindingCount of the bindings.
+	* @return Created layout.
+	*/
 	VkDescriptorSetLayout createDescriptorSetLayout(const VkDescriptorSetLayoutBinding* bindings,
 		uint32_t bindingCount);
 
@@ -125,22 +135,24 @@ private:
 	std::unordered_map<DescriptorSetLayoutInfo, VkDescriptorSetLayout, DescriptorLayoutHasher> layoutCache;
 };
 
-/// <summary>
-/// DescriptorBuilder uses PoolManager and DescriptorLayoutCache to manage and create descriptor sets.
-/// </summary>
+/**
+*
+* DescriptorBuilder uses PoolManager and DescriptorLayoutCache to manage and create descriptor sets.
+*/
 class DescriptorBuilder
 {
 public:
 	DescriptorBuilder(VkDevice device);
 	~DescriptorBuilder();
 
-	/// <summary>
-	/// Creates a descriptor set layout binding and a write descriptor set for a buffer.
-	/// </summary>
-	/// <param name="bufferInfo">struct decribing the buffer data.</param>
-	/// <param name="type">of descriptor</param>
-	/// <param name="stageFlags">Descriptor stage</param>
-	/// <returns>The builder itself.</returns>
+   /**
+	*
+	* Creates a descriptor set layout binding and a write descriptor set for a buffer.
+	* @param bufferInfo struct describing the buffer data.
+	* @param type of descriptor
+	* @param stageFlags Descriptor stage
+	* @return The builder itself.
+	*/
 	DescriptorBuilder& bindBuffer(VkDescriptorBufferInfo& bufferInfo, VkDescriptorType type,
 		VkShaderStageFlags stageFlags);
 
@@ -154,13 +166,14 @@ public:
 	 */
 	DescriptorBuilder& bindBuffers(const VkDescriptorBufferInfo* bufferInfos, VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t count);
 
-	/// <summary>
-	/// Creates a descriptor set layout binding and a write descriptor set for an image.
-	/// </summary>
-	/// <param name="imageInfo">struct decribing the image data.</param>
-	/// <param name="type">of descriptor.</param>
-	/// <param name="stageFlags">Descriptor stage.</param>
-	/// <returns>The builder itself.</returns>
+   /**
+	*
+	* Creates a descriptor set layout binding and a write descriptor set for an image.
+	* @param imageInfo struct decribing the image data.
+	* @param type of descriptor.
+	* @param stageFlags Descriptor stage.
+	* @return The builder itself.
+	*/
 	DescriptorBuilder& bindImage(VkDescriptorImageInfo& imageInfo, VkDescriptorType type,
 		VkShaderStageFlags stageFlags);
 
@@ -175,44 +188,49 @@ public:
 	DescriptorBuilder& bindImages(const VkDescriptorImageInfo* imageInfos, VkDescriptorType type,
 		VkShaderStageFlags stageFlags, uint32_t count);
 
-	/// <summary>
-	/// Builds a descriptor set and sets a created layout to the supplied parameter.
-	/// Also updates the descriptor sets.
-	/// </summary>
-	/// <param name="set"> to be created.</param>
-	/// <param name="layout"> to be filled.</param>
-	/// <returns>Boolean indicating operation status.</returns>
+   /**
+	*
+	* Builds a descriptor set and sets a created layout to the supplied parameter.
+	* Also updates the descriptor sets.
+	* @param set to be created.
+	* @param layout to be filled.
+	* @return Boolean indicating operation status.
+	*/
 	bool build(VkDescriptorSet& set, VkDescriptorSetLayout& layout);
 
-	/// <summary>
-	/// Builds a descriptor set.
-	/// </summary>
-	/// <param name="set">set to be built</param>
-	/// <returns>Boolean indicating operation status</returns>
+   /**
+	*
+	* Builds a descriptor set.
+	* @param set set to be built
+	* @return Boolean indicating operation status
+	*/
 	bool build(VkDescriptorSet& set);
 
-	/// <summary>
-	/// Sets a layout to the supplied parameter from the given bindings.
-	/// </summary>
-	/// <param name="layout"> to be set</param>
-	/// <param name="bindings"> to be used</param>
+   /**
+	*
+	* Sets a layout to the supplied parameter from the given bindings.
+	* @param layout to be set
+	* @param bindings to be used
+	*/
 	void setDescriptorSetLayout(const VkDescriptorSetLayoutBinding* bindings, uint32_t bindingCount,
 		VkDescriptorSetLayout& layout);
 
 
-	/// <summary>
-	/// Creates a descriptor set layout using builders layoutCache member.
-	/// </summary>
-	/// <param name="layoutInfo">Layout info</param>
-	/// <returns>Allocated descriptor set layout</returns>
+   /**
+	*
+	* Creates a descriptor set layout using builders layoutCache member.
+	* @param layoutInfo Layout info
+	* @return Allocated descriptor set layout
+	*/
 	VkDescriptorSetLayout createDescriptorSetLayout(VkDescriptorSetLayoutCreateInfo& layoutInfo);
 
-	/// <summary>
-	/// Creates a descriptor set layout using builders layoutCache member
-	/// </summary>
-	/// <param name="bindings"> to create a layout of.</param>
-	/// <param name="bindingCount"> of the bindings.</param>
-	/// <returns>Created layout.</returns>
+   /**
+	*
+	* Creates a descriptor set layout using builders layoutCache member
+	* @param bindings to create a layout of.
+	* @param bindingCount of the bindings.
+	* @return Created layout.
+	*/
 	VkDescriptorSetLayout createDescriptorSetLayout(const VkDescriptorSetLayoutBinding* bindings,
 		uint32_t bindingCount);
 

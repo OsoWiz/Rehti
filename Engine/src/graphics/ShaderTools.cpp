@@ -3,6 +3,8 @@
 #include <Vertex.hpp>
 
 #include <DescriptorBuilder.hpp>
+#include <Logger.hpp>
+
 
 // 3rd party
 #include <spirv-reflect/spirv_reflect.h>
@@ -17,10 +19,7 @@
 #include <array>
 #include <utility>
 
-
-int createShaderModules(const VkDevice& device, std::set<VertexAttributeEnum> attributes, VkShaderModule* vertShaderModule, VkShaderModule* fragShaderModule);
-
-int createPipelineShaderInfo(const VkDevice& device, std::set<VertexAttributeEnum> attributes, VkPipelineShaderStageCreateInfo& vertShaderStageInfo, VkPipelineShaderStageCreateInfo& fragShaderStageInfo);
+int createPipelineShaderInfo(const VkDevice& device, std::set<VertexAttributeFlags> attributes, VkPipelineShaderStageCreateInfo& vertShaderStageInfo, VkPipelineShaderStageCreateInfo& fragShaderStageInfo);
 
 
 /**
@@ -34,38 +33,59 @@ bool isCompiled(const std::filesystem::path& filePath)
 	return extension == ".spv";
 }
 
-ShaderType getShaderTypeFromFileExtension(const std::filesystem::path& filePath)
+VkShaderStageFlagBits shadercToVulkanShaderStage(SpvReflectShaderStageFlagBits stage)
+{
+	switch (stage)
+	{
+		case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:
+			return VK_SHADER_STAGE_VERTEX_BIT;
+		case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT:
+			return VK_SHADER_STAGE_FRAGMENT_BIT;
+		case SPV_REFLECT_SHADER_STAGE_GEOMETRY_BIT:
+			return VK_SHADER_STAGE_GEOMETRY_BIT;
+		case SPV_REFLECT_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
+			return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+		case SPV_REFLECT_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
+			return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+		case SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT:
+			return VK_SHADER_STAGE_COMPUTE_BIT;
+		default:
+			return static_cast<VkShaderStageFlagBits>(0);
+	}
+}
+
+ShaderStageInternal getShaderTypeFromFileExtension(const std::filesystem::path& filePath)
 {
 	std::string extension = filePath.extension().string();
 	if (extension == ".vert")
 	{
-		return ShaderType::vertex();
+		return ShaderStageInternal::vertex();
 	}
 	else if (extension == ".frag")
 	{
-		return ShaderType::fragment();
+		return ShaderStageInternal::fragment();
 	}
 	else if (extension == ".geom")
 	{
-		return ShaderType::geometry();
+		return ShaderStageInternal::geometry();
 	}
 	else if (extension == ".tesc")
 	{
-		return ShaderType::tessellation_control();
+		return ShaderStageInternal::tessellation_control();
 	}
 	else if (extension == ".tese")
 	{
-		return ShaderType::tessellation_evaluation();
+		return ShaderStageInternal::tessellation_evaluation();
 	}
 	else if (extension == ".comp")
 	{
-		return ShaderType::compute();
+		return ShaderStageInternal::compute();
 	}
 	else
 	{
 		std::cerr << " Unsupported file extension: " << extension << std::endl;
 	}
-	return ShaderType::unknown();
+	return ShaderStageInternal::unknown();
 }
 
 int readSpvToShaderData(const std::filesystem::path& filePath, CompiledShaderData& shaderData) {
@@ -86,83 +106,16 @@ int readSpvToShaderData(const std::filesystem::path& filePath, CompiledShaderDat
 }
 
 // does nothing currently
-std::string chooseSourceCode(std::set<VertexAttributeEnum> attributes, std::string& vertexSource, std::string& fragmentSource)
+std::string chooseSourceCode(std::set<VertexAttributeFlags> attributes, std::string& vertexSource, std::string& fragmentSource)
 {
 	// todo intelligent choosing of source code based on attributes
 	assert(false);
 	return "";
 }
 
-int createShaderModules(const VkDevice& device, std::set<VertexAttributeEnum> attributes, VkShaderModule* vertShaderModule, VkShaderModule* fragShaderModule)
-{
-	shaderc::Compiler compiler;
-	shaderc::CompileOptions options;
-
-	std::string vertexSource;
-	std::string fragmentSource;
-	chooseSourceCode(attributes, vertexSource, fragmentSource);
-
-	shaderc::SpvCompilationResult vertResult = compiler.CompileGlslToSpv(vertexSource, shaderc_shader_kind::shaderc_vertex_shader, "test.vert", options);
-	if (vertResult.GetCompilationStatus() != shaderc_compilation_status_success)
-	{
-		std::cerr << vertResult.GetErrorMessage();
-		return 0;
-	}
-
-	VkShaderModuleCreateInfo vertInfo{};
-	vertInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	vertInfo.codeSize = vertResult.cend() - vertResult.cbegin();
-	vertInfo.pCode = reinterpret_cast<const uint32_t*>(vertResult.cbegin());
-
-	if (vkCreateShaderModule(device, &vertInfo, nullptr, vertShaderModule) != VK_SUCCESS)
-	{
-		std::cerr << "Failed to create a vertex shader module!" << std::endl;
-		return 0;
-	}
-
-	shaderc::SpvCompilationResult fragResult = compiler.CompileGlslToSpv(fragmentSource, shaderc_shader_kind::shaderc_fragment_shader, "test.frag", options);
-	if (fragResult.GetCompilationStatus() != shaderc_compilation_status_success)
-	{
-		std::cerr << fragResult.GetErrorMessage();
-		return 0;
-	}
-
-	VkShaderModuleCreateInfo fragInfo{};
-	fragInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	fragInfo.codeSize = fragResult.cend() - fragResult.cbegin();
-	fragInfo.pCode = reinterpret_cast<const uint32_t*>(fragResult.cbegin());
-
-	if (vkCreateShaderModule(device, &fragInfo, nullptr, fragShaderModule) != VK_SUCCESS)
-	{
-		std::cerr << "Failed to create a fragment shader module!" << std::endl;
-		return 0;
-	}
-
-	return 1;
-}
-
-int createPipelineShaderInfo(const VkDevice& device, std::set<VertexAttributeEnum> attributes, VkPipelineShaderStageCreateInfo& vertShaderStageInfo, VkPipelineShaderStageCreateInfo& fragShaderStageInfo)
-{
-	VkPipelineShaderStageCreateInfo vertShaderInfo{};
-	vertShaderInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderInfo.pName = "main";
-	VkPipelineShaderStageCreateInfo fragShaderInfo{};
-	fragShaderInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderInfo.pName = "main";
-
-	createShaderModules(device, attributes, &vertShaderInfo.module, &fragShaderInfo.module);
-
-	vertShaderStageInfo = vertShaderInfo;
-	fragShaderStageInfo = fragShaderInfo;
-
-	return 1;
-}
-
 ShaderTools::ShaderTools(VkDevice device)
+: device(device)
 {
-
 	this->pDescriptorBuilder = std::make_unique<DescriptorBuilder>(device);
 }
 
@@ -177,7 +130,7 @@ void ShaderTools::reflectShaderCode(const uint32_t* pCode, const size_t codeSize
 	{
 		std::cerr << "Failed to reflect shader module!" << std::endl;
 	}
-	shaderModule.stageFlag = static_cast<VkShaderStageFlagBits>(module.shader_stage);
+	shaderModule.stageFlag = shadercToVulkanShaderStage(module.shader_stage);
 
 	uint32_t count = 0; // count for each reflectable variable.
 
@@ -236,12 +189,12 @@ void ShaderTools::reflectShaderCode(const uint32_t* pCode, const size_t codeSize
 		createInfo.pBindings = goalBindings.data();
 		if (setIndex < MAX_DESCRIPTOR_SETS)
 		{
-			shaderModule.descriptorSetLayouts[setIndex] = this->pDescriptorBuilder->createDescriptorSetLayout(createInfo);
+			shaderModule.descriptorSetLayouts[set->set] = this->pDescriptorBuilder->createDescriptorSetLayout(createInfo);
 			setIndex++;
 		}
 		else
 		{
-			std::cerr << "Error: too many descriptor sets in shader " << module.source_file << std::endl;
+			Logger::warning("Error: too many descriptor sets in shader " + std::string(module.source_file));
 		}
 	}
 	// push constants
@@ -274,14 +227,13 @@ void ShaderTools::reflectShaderCode(const uint32_t* pCode, const size_t codeSize
 
 	// cleanup
 	spvReflectDestroyShaderModule(&module);
-
 }
 
-int ShaderTools::compileShader(const std::string& code, const std::string& shaderName, const ShaderType type, CompiledShaderData& shaderModule)
+int ShaderTools::compileShader(const std::string& code, const std::string& shaderName, const ShaderStageInternal type, CompiledShaderData& shaderModule)
 {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
-
+	
 	shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(code, type.shaderKind, shaderName.c_str(), options);
 	if (result.GetCompilationStatus() != shaderc_compilation_status_success)
 	{
@@ -316,7 +268,7 @@ void ShaderTools::loadShader(const std::string& shaderPath)
 	else
 	{
 		std::ifstream ifs(path);
-		ShaderType type = getShaderTypeFromFileExtension(path);
+		ShaderStageInternal type = getShaderTypeFromFileExtension(path);
 		std::string sourceCode(std::istreambuf_iterator<char>{ifs}, {});
 		if (compileShader(sourceCode, path.string(), type, data) != 0)
 		{
@@ -328,7 +280,57 @@ void ShaderTools::loadShader(const std::string& shaderPath)
 	SpvReflectShaderModule reflectModule{};
 	reflectShaderCode(data.code.data(), data.code.size(), reflectModule, data);
 	// set shader module to the map
-	this->compiledShaders[path.string()] = data;
+	this->compiledShaders.push_back(data);
+}
+
+CompiledShaderData ShaderTools::compileShader(const ShaderAsset& shader)
+{
+	CompiledShaderData data{};
+	shaderc::Compiler compiler;
+	shaderc::CompileOptions options;
+	shaderc::SpvCompilationResult compResult{};
+	switch (shader.format)
+	{
+		case ShaderAsset::Format::SPIRV:
+			data.code = std::vector<uint32_t>(shader.bytes.size() / sizeof(uint32_t));
+			std::memcpy(data.code.data(), shader.bytes.data(), shader.bytes.size());
+			return data;
+		case ShaderAsset::Format::GLSL:
+			compResult = compiler.CompileGlslToSpv(reinterpret_cast<const char*>(shader.bytes.data()), shader.bytes.size(), shaderc_shader_kind::shaderc_glsl_infer_from_source, "shader.glsl", options);
+			if (compResult.GetCompilationStatus() != shaderc_compilation_status_success)
+			{
+				Logger::error(compResult.GetErrorMessage());
+				return {};
+			}
+			data.code = std::vector<uint32_t>(compResult.cbegin(), compResult.cend());
+			break;
+		default:
+			Logger::error("Unsupported shader format!");
+			return {};
+	}
+	
+	if (shader.format != ShaderAsset::Format::SPIRV 
+		&& compResult.GetCompilationStatus() != shaderc_compilation_status_success)
+	{
+		Logger::error(compResult.GetErrorMessage());
+		return {};
+	}
+
+	SpvReflectShaderModule reflectModule{};
+	reflectShaderCode(data.code.data(), data.code.size(), reflectModule, data);
+
+	VkShaderModuleCreateInfo vertInfo{};
+	vertInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	vertInfo.codeSize = compResult.cend() - compResult.cbegin();
+	vertInfo.pCode = reinterpret_cast<const uint32_t*>(compResult.cbegin());
+
+	if (vkCreateShaderModule(device, &vertInfo, nullptr, &data.module) != VK_SUCCESS)
+	{
+		Logger::error("Failed to create a vertex shader module!");
+		return {};
+	}
+	compiledShaders.push_back(data);
+	return data;
 }
 
 bool ShaderTools::validate(const CompiledShaderData& shaderModule)

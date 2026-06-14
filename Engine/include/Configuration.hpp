@@ -15,9 +15,14 @@ public:
 	template<typename T>
 	std::optional<T> getSetting(const std::string& key) const
 	{
-		std::string value = settings[key];
+		const auto it = settings.find(key);
+		if (it == settings.end())
+			return std::nullopt;
+
+		const std::string& value = it->second;
 		if (value.empty())
 			return std::nullopt;
+
 		if constexpr (std::is_same_v<T, int>)
 			return std::stoi(value);
 		else if constexpr (std::is_same_v<T, unsigned int>)
@@ -32,6 +37,15 @@ public:
 			return value;
 		else
 			static_assert(!sizeof(T*), "Unsupported type");
+	}
+
+	template<typename T>
+	T getOrElse(const std::string& key, T alternative) const
+	{
+		auto val = getSetting<T>(key);
+		if (val.has_value())
+			return val.value();
+		return alternative;
 	}
 
 private:

@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <optional>
 
-struct PipelineShaderInfo
+// FWD
+struct GraphicsPipelineConfig;
+
+struct PipelineShaderData
 {
 	std::optional<CompiledShaderData> vertexShaderData;
 	std::optional<CompiledShaderData> tessControlShaderData;
@@ -38,7 +41,7 @@ struct PipelineShaderInfo
 	std::vector<VkPipelineShaderStageCreateInfo> getShaderStageInfos() const;
 
 	/**
-	 * @brief Returns the stride of the vertex for vertex shader.
+	 * @brief Returns the stride of the vertex ASSUMING vertex attributes are interleaved.
 	 * @returns the combined calculated size of the input variables of the vertex shader.
 	 */
 	uint32_t getStride() const;
@@ -49,7 +52,24 @@ struct PipelineShaderInfo
 	 */
 	VertexAttributeFlags getAttributes() const;
 
-}; // END OF PipelineShaderInfo
+}; // END OF PipelineShaderData
+
+struct PipelineCreationDetails
+{
+	bool interleavedVertexData = false;
+	std::vector<VkFormat> colorAttachmentFormats;
+	VkFormat depthAttachmentFormat;
+	VkFormat stencilAttachmentFormat;
+};
+
+
+struct CompiledPipelineData
+{
+	VkPipeline pipeline;
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+	std::vector<VkPushConstantRange> pushConstantRanges;
+	VertexAttributeFlags vertexAttributes;
+};
 
 /**
  * @brief Class for holding and managing pipelines
@@ -58,24 +78,14 @@ class PipelineManager
 {
 public:
 
-	PipelineManager(VkDevice& logDevice, VkExtent2D& currentExtent);
+	PipelineManager(VkDevice& logDevice);
+	~PipelineManager();
 
-	/**
-	 * @brief Creates a basic pipeline with the given vertex and fragment shaders.
-	 * @param renderPass to associate with the pipeline
-	 * @param vShaderData compiled vertex shader
-	 * @param fShaderData compiled fragment shader
-	 */
-	void createBasicPipeline(const VkRenderPass& renderPass, const CompiledShaderData& vShaderData, const CompiledShaderData& fShaderData);
+	CompiledPipelineData createPipeline(const PipelineShaderData& pipelineShaders, const GraphicsPipelineConfig& config, const PipelineCreationDetails& details);
 
-
-	void createPipeline(const VkRenderPass& renderPass, const PipelineShaderInfo& compiledShaders);
-
-	VkPipeline getPipeline(VertexAttributeFlags attributes);
+	std::optional<CompiledPipelineData> findPipeline(VertexAttributeFlags attributes);
 
 private:
-	// map of vertex attributes to pipelines
-	std::unordered_map<VertexAttributeFlags, VkPipeline> pipelines;
+	std::vector<CompiledPipelineData> pipelines;
 	VkDevice logDevice;
-	VkExtent2D swapChainExtent;
 };

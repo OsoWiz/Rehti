@@ -4,7 +4,7 @@
 #include <imgui_impl_vulkan.h>
 #include <imgui_impl_sdl3.h>
 
-void UIManager::initializeImGui(SDL_Window* sdlWindowPtr, ImGui_ImplVulkan_InitInfo& initInfoPtr)
+UIManager::UIManager(SDL_Window* sdlWindowPtr, ImGui_ImplVulkan_InitInfo& initInfoPtr)
 {
 	// Initialize ImGui context
 	IMGUI_CHECKVERSION();
@@ -15,6 +15,12 @@ void UIManager::initializeImGui(SDL_Window* sdlWindowPtr, ImGui_ImplVulkan_InitI
 	ImGui_ImplVulkan_Init(&initInfoPtr);
 }
 
+UIManager::~UIManager()
+{
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplSDL3_Shutdown();
+	ImGui::DestroyContext();
+}
 
 void UIManager::newFrame()
 {

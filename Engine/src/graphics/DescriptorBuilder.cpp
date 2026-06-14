@@ -67,7 +67,7 @@ bool PoolManager::allocateDescriptorSet(VkDescriptorSetLayout layout, VkDescript
 		usedPools.push_back(currentPool);
 		allocInfo.descriptorPool = currentPool;
 		allocResult = vkAllocateDescriptorSets(logDevice, &allocInfo, &descSet);
-		if (allocResult == VK_SUCCESS)
+        if (allocResult == VK_SUCCESS)
 		{
 			return true;
 		}
@@ -86,7 +86,7 @@ VkDescriptorPool PoolManager::createPool(VkDevice device, VkDescriptorPoolCreate
 	createInfo.pPoolSizes = poolSizes.data();
 
 	VkDescriptorPool pool;
-	if (vkCreateDescriptorPool(device, &createInfo, nullptr, &pool) != VK_SUCCESS)
+    if (vkCreateDescriptorPool(device, &createInfo, nullptr, &pool) != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to create descriptor pool");
 	}
@@ -159,7 +159,7 @@ VkDescriptorSetLayout DescriptorSetLayoutCache::createDescriptorSetLayout(VkDesc
 	}
 	else
 	{ // not found
-		if (vkCreateDescriptorSetLayout(logDevice, &layoutInfo, nullptr, &layout) != VK_SUCCESS)
+        if (vkCreateDescriptorSetLayout(logDevice, &layoutInfo, nullptr, &layout) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to create descriptor set layout");
 		}
@@ -340,7 +340,6 @@ bool DescriptorBuilder::build(VkDescriptorSet& set, VkDescriptorSetLayout& layou
 	{
 		return false;
 	}
-
 	// And then handle the writes
 	for (VkWriteDescriptorSet& write : writeSets)
 	{
