@@ -1,20 +1,12 @@
 #pragma once
-
-#include <Vertex.hpp>
+#include "RehtiAsset.hpp"
 #include <shaderc/shaderc.hpp>
 #include <unordered_map>
 #include <array>
+#include <vulkan/vulkan.h>
 
 // Forward declarations
 class DescriptorBuilder;
-
-
-/**
- * @brief ShaderInterfaceVariable is a pair of VertexAttributeEnum and VkFormat.
- */
-using ShaderInterfaceVariable = std::pair<VertexAttributeFlags, VkFormat>;
-
-// forward declarations
 class SpvReflectShaderModule;
 
 // constants
@@ -57,13 +49,13 @@ struct CompiledShaderData
 {
 	std::vector<VkPushConstantRange> pushConstantRanges;
 	std::array<VkDescriptorSetLayout, MAX_DESCRIPTOR_SETS> descriptorSetLayouts;
-	std::vector<ShaderInterfaceVariable> inputAttributes;
-	std::vector<ShaderInterfaceVariable> outputAttributes;
 	std::vector<uint32_t> code;
 	VkShaderModule module;
 	VkShaderStageFlagBits stageFlag;
+	ShaderInterface interface;
 
 	VkPipelineShaderStageCreateInfo getShaderStageInfo() const;
+	VertexAttributeFlags getInputAttributeFlags() const; // just interface.getLikelyVertexAttributes().
 };
 
 class ShaderTools

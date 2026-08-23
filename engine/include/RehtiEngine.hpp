@@ -36,6 +36,8 @@ public:
 	 */
 	static flecs::world& getWorld();
 
+	// TODO If the loop lives here there needs to be some sort of translation
+	// from SDL events to consumers (subsystems)
 	void eventLoop();
 
 private:

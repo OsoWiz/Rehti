@@ -29,6 +29,7 @@ find_package(VulkanHeaders CONFIG REQUIRED)
 find_package(VulkanLoader CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(SPIRV-Tools CONFIG REQUIRED)
+find_package(unofficial-spirv-reflect CONFIG REQUIRED)
 find_package(SDL3 CONFIG REQUIRED)
 find_package(SDL3_IMAGE CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
@@ -51,7 +52,28 @@ set(AUDIO_SOURCE_DIR ${REHTI_SOURCE_DIR}/audio/)
 set(INPUT_SOURCE_DIR ${REHTI_SOURCE_DIR}/input/)
 set(NETWORKING_SOURCE_DIR ${REHTI_SOURCE_DIR}/networking/)
 set(UTIL_SOURCE_DIR ${REHTI_SOURCE_DIR}/util/)
-set(RESOURCES_DIR ${REHTI_ENGINE_DIR}/resources/)
+set(REHTI_RESOURCES_DIR ${REHTI_ENGINE_DIR}/resources/)
+
+set(REHTI_LIBRARIES 
+	PUBLIC
+	Vulkan::Headers
+	Vulkan::Vulkan
+	GPUOpen::VulkanMemoryAllocator
+	Vulkan::Loader
+	unofficial::spirv-reflect
+	SPIRV-Tools-static
+	glm::glm
+	assimp::assimp
+	SDL3::SDL3
+	$<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image>,SDL3_image::SDL3_image,SDL3_image::SDL3_image-static>
+	$<IF:$<TARGET_EXISTS:flecs::flecs>,flecs::flecs,flecs::flecs_static>
+	Boost::log
+	Boost::log_setup
+	jsoncpp_lib
+	glslang::glslang glslang::glslang-default-resource-limits glslang::SPIRV
+	unofficial::shaderc::shaderc
+	imgui::imgui
+)
 
 # Add source to this project's executable.
 add_subdirectory(engine)

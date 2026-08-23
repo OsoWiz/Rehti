@@ -44,7 +44,7 @@ struct PipelineShaderData
 	 * @brief Returns the stride of the vertex ASSUMING vertex attributes are interleaved.
 	 * @returns the combined calculated size of the input variables of the vertex shader.
 	 */
-	uint32_t getStride() const;
+	size_t getStride() const;
 
 	/**
 	 * @brief Returns the vertex attribute flags for this shader.
@@ -66,6 +66,7 @@ struct PipelineCreationDetails
 struct CompiledPipelineData
 {
 	VkPipeline pipeline;
+	VkPipelineLayout layout;
 	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 	std::vector<VkPushConstantRange> pushConstantRanges;
 	VertexAttributeFlags vertexAttributes;
@@ -81,11 +82,15 @@ public:
 	PipelineManager(VkDevice& logDevice);
 	~PipelineManager();
 
-	CompiledPipelineData createPipeline(const PipelineShaderData& pipelineShaders, const GraphicsPipelineConfig& config, const PipelineCreationDetails& details);
+	CompiledPipelineData createPipeline(const GraphicsPipelineConfig& config, const PipelineCreationDetails& details);
 
 	std::optional<CompiledPipelineData> findPipeline(VertexAttributeFlags attributes);
 
+	std::vector<VkDynamicState> getDynamicStates() const;
 private:
+	PipelineShaderData getPipelineShaders(const GraphicsPipelineConfig& config);
 	std::vector<CompiledPipelineData> pipelines;
 	VkDevice logDevice;
+	std::unique_ptr<ShaderTools> shaderTools;
+	// std::vector<VkDynamicState> dynamicStates; TODO add ability to configure dynamic states. (ctor?)
 };

@@ -4,22 +4,24 @@ project(engine)
 set(GRAPHICS_SOURCES 
 	${REHTI_INCLUDE_DIR}/RehtiGraphics.hpp
 	${GRAPHICS_SOURCE_DIR}/RehtiGraphics.cpp
+	${GRAPHICS_SOURCE_DIR}/Camera.hpp
+	${GRAPHICS_SOURCE_DIR}/Camera.cpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsTypesInternal.hpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsTypesInternal.cpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsResources.hpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsResources.cpp
-	${GRAPHICS_SOURCE_DIR}/Camera.hpp
-	${GRAPHICS_SOURCE_DIR}/Camera.cpp
 	${GRAPHICS_SOURCE_DIR}/DescriptorBuilder.hpp
 	${GRAPHICS_SOURCE_DIR}/DescriptorBuilder.cpp
-	${GRAPHICS_SOURCE_DIR}/ShaderTools.hpp
-	${GRAPHICS_SOURCE_DIR}/ShaderTools.cpp
-	${GRAPHICS_SOURCE_DIR}/PipelineManager.hpp
-	${GRAPHICS_SOURCE_DIR}/PipelineManager.cpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsResourceManager.hpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsResourceManager.cpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsUtils.hpp
 	${GRAPHICS_SOURCE_DIR}/GraphicsUtils.cpp
+	${GRAPHICS_SOURCE_DIR}/ShaderTools.hpp
+	${GRAPHICS_SOURCE_DIR}/ShaderTools.cpp
+	${GRAPHICS_SOURCE_DIR}/PipelineManager.hpp
+	${GRAPHICS_SOURCE_DIR}/PipelineManager.cpp
+	${GRAPHICS_SOURCE_DIR}/ShaderObject.hpp
+	${GRAPHICS_SOURCE_DIR}/ShaderObject.cpp
 	${GRAPHICS_SOURCE_DIR}/UIManager.hpp
 	${GRAPHICS_SOURCE_DIR}/UIManager.cpp
 )
@@ -76,6 +78,7 @@ set(ENGINE_SOURCES
 	${CORE_SOURCE_DIR}/BasicAttributes.cpp
 	${REHTI_INCLUDE_DIR}/RehtiAsset.hpp
 	${CORE_SOURCE_DIR}/RehtiAsset.cpp
+	${REHTI_INCLUDE_DIR}/GraphicsTypes.hpp
 	${CORE_SOURCE_DIR}/TaggedPointer.hpp
 	${CORE_SOURCE_DIR}/TaggedPointer.cpp
 	${REHTI_INCLUDE_DIR}/EngineSubsystem.hpp
@@ -105,24 +108,11 @@ source_group("util" FILES ${UTIL_SOURCES})
 # source_group("shaders" SOURCES ${SHADER_FILES})
 
 target_link_libraries(engine
-	PUBLIC
-	Vulkan::Headers
-	Vulkan::Vulkan
-	GPUOpen::VulkanMemoryAllocator
-	Vulkan::Loader
-	SPIRV-Tools-static
-	glm::glm
-	assimp::assimp
-	SDL3::SDL3
-	$<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image>,SDL3_image::SDL3_image,SDL3_image::SDL3_image-static>
-	$<IF:$<TARGET_EXISTS:flecs::flecs>,flecs::flecs,flecs::flecs_static>
-	Boost::log
-	Boost::log_setup
-	jsoncpp_lib 
-	glslang::glslang glslang::glslang-default-resource-limits glslang::SPIRV glslang::SPVRemapper
-	unofficial::shaderc::shaderc
-	imgui::imgui
+	PRIVATE 
+	${REHTI_LIBRARIES}
 	)
 
 # add_subdirectory(tools)
 target_include_directories(engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+target_compile_definitions(engine PUBLIC RESOURCES_DIR="${REHTI_RESOURCES_DIR}")

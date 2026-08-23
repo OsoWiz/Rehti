@@ -1,7 +1,5 @@
 #include "ShaderTools.hpp"
 
-#include <Vertex.hpp>
-
 #include <DescriptorBuilder.hpp>
 #include <Logger.hpp>
 
@@ -19,9 +17,6 @@
 #include <array>
 #include <utility>
 
-int createPipelineShaderInfo(const VkDevice& device, std::set<VertexAttributeFlags> attributes, VkPipelineShaderStageCreateInfo& vertShaderStageInfo, VkPipelineShaderStageCreateInfo& fragShaderStageInfo);
-
-
 /**
  * @brief Checks whether file is already compiled based on the extension.
  * @param filePath
@@ -31,6 +26,40 @@ bool isCompiled(const std::filesystem::path& filePath)
 {
 	std::string extension = filePath.extension().string();
 	return extension == ".spv";
+}
+
+Rehti::Format mapToRehtiFormat(const SpvReflectFormat format)
+{
+	switch (format)
+	{
+		case SPV_REFLECT_FORMAT_R32_UINT:
+			return Rehti::Format::UInt32;
+		case SPV_REFLECT_FORMAT_R32_SINT:
+			return Rehti::Format::Int32;
+		case SPV_REFLECT_FORMAT_R32_SFLOAT:
+			return Rehti::Format::Float32;
+		case SPV_REFLECT_FORMAT_R32G32_UINT:
+			return Rehti::Format::UVec2;
+		case SPV_REFLECT_FORMAT_R32G32_SINT:
+			return Rehti::Format::IVec2;
+		case SPV_REFLECT_FORMAT_R32G32_SFLOAT:
+			return Rehti::Format::Vec2;
+		case SPV_REFLECT_FORMAT_R32G32B32_UINT:
+			return Rehti::Format::UVec3;
+		case SPV_REFLECT_FORMAT_R32G32B32_SINT:
+			return Rehti::Format::IVec3;
+		case SPV_REFLECT_FORMAT_R32G32B32_SFLOAT:
+			return Rehti::Format::Vec3;
+		case SPV_REFLECT_FORMAT_R32G32B32A32_UINT:
+			return Rehti::Format::UVec4;
+		case SPV_REFLECT_FORMAT_R32G32B32A32_SINT:
+			return Rehti::Format::IVec4;
+		case SPV_REFLECT_FORMAT_R32G32B32A32_SFLOAT:
+			return Rehti::Format::Vec4;
+		default:
+			Logger::error("Unsupported SPIRV format: " + std::to_string(format));
+			return Rehti::Format::Undefined;
+	}
 }
 
 VkShaderStageFlagBits shadercToVulkanShaderStage(SpvReflectShaderStageFlagBits stage)
@@ -83,7 +112,7 @@ ShaderStageInternal getShaderTypeFromFileExtension(const std::filesystem::path& 
 	}
 	else
 	{
-		std::cerr << " Unsupported file extension: " << extension << std::endl;
+		Logger::error("Unsupported file extension: " + extension);
 	}
 	return ShaderStageInternal::unknown();
 }
@@ -92,7 +121,7 @@ int readSpvToShaderData(const std::filesystem::path& filePath, CompiledShaderDat
 	std::ifstream file(filePath, std::ios::binary | std::ios::ate);
 	if (!file.is_open())
 	{
-		std::cerr << "Failed to open file: " << filePath.string() << std::endl;
+		Logger::error("Failed to open file: " + filePath.string());
 		return 1;
 	}
 	size_t fileSize = file.tellg();
@@ -128,7 +157,7 @@ void ShaderTools::reflectShaderCode(const uint32_t* pCode, const size_t codeSize
 	SpvReflectResult reflectionRes = spvReflectCreateShaderModule(codeSize, pCode, &module);
 	if (reflectionRes != SPV_REFLECT_RESULT_SUCCESS)
 	{
-		std::cerr << "Failed to reflect shader module!" << std::endl;
+		Logger::error("Failed to reflect shader module!");
 	}
 	shaderModule.stageFlag = shadercToVulkanShaderStage(module.shader_stage);
 
@@ -182,8 +211,8 @@ void ShaderTools::reflectShaderCode(const uint32_t* pCode, const size_t codeSize
 		}
 		if (goalBindings.size() != set->binding_count)
 		{
-			std::cerr << "Error: binding count mismatch in shader " << module.source_file << ":\n" <<
-				"expected " << set->binding_count << " got " << goalBindings.size() << std::endl;
+			Logger::error("Error: binding count mismatch in shader " + std::string(module.source_file) + ":\n" +
+				"expected " + std::to_string(set->binding_count) + " got " + std::to_string(goalBindings.size()));
 		}
 		createInfo.bindingCount = goalBindings.size();
 		createInfo.pBindings = goalBindings.data();
@@ -208,21 +237,23 @@ void ShaderTools::reflectShaderCode(const uint32_t* pCode, const size_t codeSize
 	}
 
 	// input variables
-	shaderModule.inputAttributes.reserve(inputVariables.size());
 	for (auto& input : inputVariables)
 	{
-		ShaderInterfaceVariable var{};
-		var.second = static_cast<VkFormat>(input->format);
-		shaderModule.inputAttributes[input->location] = var;
+		ShaderInterface::ShaderInputOutput inputVar{};
+		inputVar.format = mapToRehtiFormat(input->format);
+		inputVar.location = input->location;
+		shaderModule.interface.inputs.push_back(inputVar);
 	}
 
 	// output variables
-	shaderModule.outputAttributes.reserve(outputVariables.size());
+	std::vector<ShaderInterface> outputAttributes;
+	outputAttributes.reserve(outputVariables.size());
 	for (auto& output : outputVariables)
 	{
-		ShaderInterfaceVariable var{};
-		var.second = static_cast<VkFormat>(output->format);
-		shaderModule.outputAttributes[output->location] = var;
+		ShaderInterface::ShaderInputOutput outputVar{};
+		outputVar.format = mapToRehtiFormat(output->format);
+		outputVar.location = output->location;
+		shaderModule.interface.outputs.push_back(outputVar);
 	}
 
 	// cleanup
@@ -349,4 +380,9 @@ VkPipelineShaderStageCreateInfo CompiledShaderData::getShaderStageInfo() const
 	info.pName = "main";
 	return info;
 
+}
+
+VertexAttributeFlags CompiledShaderData::getInputAttributeFlags() const
+{
+	return interface.getLikelyVertexAttributes();
 }

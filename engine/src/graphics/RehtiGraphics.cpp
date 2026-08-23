@@ -54,13 +54,20 @@ struct RehtiGraphics::Backend
 {
 	// decl
 	// Members
-	~Backend() = default; // manual cleanup.
+	Backend(RehtiGraphics& parent) : parent(parent) 
+	{
+		Logger::info("RehtiGraphics backend created.");
+	}
+	~Backend()
+	{
+		cleanup();
+	}; // manual cleanup.
 
 	void initialize(const Settings& graphicsSettings);
 	void cleanup();
 
+	RehtiGraphics& parent;
 	SDL_Window* window = nullptr;
-	flecs::world& world;
 	// Vulkan structures
 	uint32_t vulkanVersion = 0u;
 	VkInstance instance = VK_NULL_HANDLE;
@@ -82,7 +89,7 @@ struct RehtiGraphics::Backend
 
 	VkRenderPass renderPass = VK_NULL_HANDLE;
 	
-	VkFormat depthFormat;
+	VkFormat depthFormat = VK_FORMAT_UNDEFINED;
 	Image depthImage;
 	VkCommandPool commandPool = VK_NULL_HANDLE;
 
@@ -97,7 +104,8 @@ struct RehtiGraphics::Backend
 	std::unique_ptr <PipelineManager> pipelineManager;
     std::unique_ptr<GraphicsResourceManager> resourceManager;
 
-	flecs::query<> drawQuery;
+	flecs::query<IndexedDrawable> drawQuery;
+	flecs::system drawSystem;
 
 	// setup functions
 	void createInstance();
@@ -108,11 +116,9 @@ struct RehtiGraphics::Backend
 	void createLogicalDevice();
 	void createGraphicsResourceManager();
 	void createPipelineManager();
-	void createShaderTools();
 	void createSwapChain();
 	void createImageViews();
 	void createDepthResources();
-	// Todo make a compile time config for choosing between renderpass and dynamic?
 	void createRenderPass();
 	void createFramebuffers();
 	void createCommandPool();
@@ -121,6 +127,7 @@ struct RehtiGraphics::Backend
 
 	void createDrawQuery();
 
+	void recordDynamicStateCommands();
 	void recordDrawCommands();
 
 	uint32_t currentFrame = 0;
@@ -383,17 +390,36 @@ void RehtiGraphics::Backend::createGraphicsResourceManager()
 	QueueDetails queueDetails{};
 	queueDetails.familyIndex = findQueueFamilies(this->physDevice, this->surface).graphicsFamily.value();
 	queueDetails.queue = graphicsQueue;
-    this->resourceManager.reset(new GraphicsResourceManager(vulkanVersion, logDevice, physDevice, queueDetails));
+    this->resourceManager.reset(new GraphicsResourceManager(vulkanVersion, this->instance, logDevice, physDevice, queueDetails));
 }
 
 void RehtiGraphics::Backend::createPipelineManager()
 {
 	this->pipelineManager.reset(new PipelineManager(logDevice));
-}
+	drawQuery = parent.getWorld().query_builder<IndexedDrawable>().group_by<AttachedToPipeline>().build();
+	drawSystem = parent.getWorld().system("DrawSystem").run([this](flecs::iter& it)
+		{
+			for (auto group : drawQuery.groups())
+			{
+				flecs::entity pipelineEntity = parent.getWorld().entity(group.first);
+				const CompiledPipelineData& pipelineData = pipelineEntity.get<CompiledPipelineData>();
+				if (!pipelineData.pipeline)
+				{
+					throw RehtiException(RehtiError::RESOURCE_NOT_FOUND, "Graphics Pipeline not found for entity " + std::to_string(pipelineEntity.id()));
+				}
+				vkCmdBindPipeline(this->commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.pipeline);
+				drawQuery.set_group(pipelineEntity).each([this, &pipelineData](flecs::entity e, IndexedDrawable& drawObj)
+					{
+						vkCmdBindDescriptorSets(this->commandBuffers[currentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineData.layout, 0, 1, &drawObj.descriptorSet, 0, nullptr);
+						VkDeviceSize noOffset = 0;
+						vkCmdBindVertexBuffers2(this->commandBuffers[currentFrame], 0, 1, &drawObj.vertexBuffer, &noOffset, &drawObj.details.vertexBufferSize, &drawObj.details.stride);
+						vkCmdBindIndexBuffer2(this->commandBuffers[currentFrame], drawObj.indexBuffer, 0, drawObj.details.vertexBufferSize, VK_INDEX_TYPE_UINT32);
+						// todo instance count for shared models
+						vkCmdDrawIndexed(this->commandBuffers[currentFrame], drawObj.details.indexCount, 1, 0, 0, 0);
+					});
 
-void RehtiGraphics::Backend::createShaderTools()
-{
-	this->shaderTools.reset(new ShaderTools(logDevice));
+			} // group for end
+		});
 }
 
 VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)
@@ -788,19 +814,30 @@ void RehtiGraphics::Backend::createSynchronization()
 
 void RehtiGraphics::Backend::createDrawQuery()
 {
-	this->drawQuery = world.query_builder<IndexedDrawable>()
-			.with(flecs::pair<Pipeline, flecs::Wildcard>()).build();
+	/*this->drawQuery = world.query_builder<IndexedDrawable>()
+			.with(flecs::pair<Pipeline, flecs::Wildcard>()).build();*/
+}
+
+void RehtiGraphics::Backend::recordDynamicStateCommands()
+{
+	VkViewport viewport{};
+	viewport.height = static_cast<float>(swapChainExtent.height);
+	viewport.width = static_cast<float>(swapChainExtent.width);
+	viewport.maxDepth = 1.0f;
+	viewport.minDepth = 0.0f;
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	vkCmdSetViewport(commandBuffers[currentFrame], 0, 1, &viewport);
+	VkRect2D scissors{ {0, 0}, swapChainExtent };
+	vkCmdSetScissor(commandBuffers[currentFrame], 0, 1, &scissors);
 }
 
 void RehtiGraphics::Backend::recordDrawCommands()
 {
 	VkRenderingAttachmentInfo colorAttachment{};
-
 	colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-
 	colorAttachment.imageView = swapChainImageViews[currentFrame];
 	colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
 	colorAttachment.clearValue.color = GraphicsConstants::CLEAR_COLOR;
 
 	VkRenderingAttachmentInfo depthAttachment{};
@@ -808,22 +845,20 @@ void RehtiGraphics::Backend::recordDrawCommands()
 	depthAttachment.imageView = depthImage.view;
 	depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-
 	VkRenderingInfo renderingInfo{};
 	renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
 	renderingInfo.colorAttachmentCount = 1;
 	renderingInfo.pColorAttachments = &colorAttachment;
 	renderingInfo.pDepthAttachment = &depthAttachment;
+	
 	VkRect2D renderArea{};
 	renderArea.offset = { 0, 0 };
 	renderArea.extent = swapChainExtent;
 	renderingInfo.renderArea = renderArea;
 
 	vkCmdBeginRendering(commandBuffers[currentFrame], &renderingInfo);
-	// Todo draw calls here.
-	// flecs system = query and the corresponding function. E.g. 
-	// So I guess here there could be a system for recording draw calls but seems a bit unhelpful?
-	// because why would you record those commands only as part of a system? No, you want to run the draw loop as a part of the system.
+	
+
 
 	vkCmdEndRendering(commandBuffers[currentFrame]);
 }
@@ -948,10 +983,10 @@ void RehtiGraphics::Backend::initialize(const Settings& graphicsSettings)
 }
 
 RehtiGraphics::RehtiGraphics(flecs::world& world)
-: EngineSubsystem(world), backendInstance(std::make_unique<Backend>())
+: EngineSubsystem(world), backendInstance(std::make_unique<Backend>(*this))
 {
-	backendInstance->world = world;
 }
+
 RehtiGraphics::~RehtiGraphics() = default;
 
 int RehtiGraphics::initialize(const Configuration& config)
@@ -962,9 +997,8 @@ int RehtiGraphics::initialize(const Configuration& config)
 	return 0;
 }
 
-int RehtiGraphics::cleanup()
+int RehtiGraphics::preDestroy()
 {
-	backendInstance->cleanup();
     return 0;
 }
 
@@ -975,29 +1009,17 @@ bool RehtiGraphics::isInitialized() const
 
 void RehtiGraphics::drawFrame() const
 {
-	// Todo.
-	// How is drawing configured
-	// for enabled pipelines:
-	// vkcmd bind pipeline
-	// vkcmd bind desc
-	//  for each compatible / enabled rendering target?
-	// draw()
-	//
-}
-
-CompiledShaderHandle RehtiGraphics::compileShader(const ShaderAsset& shader)
-{
-	flecs::entity shaderEntity = this->world.entity();
-	CompiledShaderData compiledShaders = this->backendInstance->shaderTools->compileShader(shader);
-	shaderEntity.set<CompiledShaderData>(compiledShaders);
-    return CompiledShaderHandle(shaderEntity.id()); // todo think where these are stored XD
+	backendInstance->drawSystem.run();
 }
 
 PipelineHandle RehtiGraphics::createGraphicsPipeline(const GraphicsPipelineConfig& pipelineConfig)
 {
 	flecs::entity pipelineEntity = this->world.entity();
-    CompiledPipelineData pipeline = backendInstance->pipelineManager.createPipeline(_placeholder_, _placeholder_, _placeholder_);
-	pipelineEntity.set<CompiledPipelineData>(CompiledPipelineData{});
+	PipelineCreationDetails details{};
+	CompiledPipelineData pipeline = backendInstance->pipelineManager->createPipeline(pipelineConfig, details);
+	pipelineEntity.set<CompiledPipelineData>(pipeline);
+	pipelineEntity.add<IndexedDrawableList >();
+	// Also create a query for this pipeline.
 
 	return PipelineHandle{pipelineEntity.id()};
 }
@@ -1014,18 +1036,31 @@ GraphicsObjectHandle RehtiGraphics::createGraphicsObject(const Mesh& mesh)
 	allocDetails.memUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 	allocDetails.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	Buffer vertexBuffer = backendInstance->resourceManager->createBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, allocDetails);
-    Buffer indexBuffer = backendInstance->resourceManager->createBuffer(mesh.indices.size() * sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, allocDetails);
+    Buffer indexBuffer = backendInstance->resourceManager->createBuffer(mesh.getIndexSize(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, allocDetails);
 	backendInstance->resourceManager->copyToBuffer(vertexBuffer, vertexDataBytes.data());
     backendInstance->resourceManager->copyToBuffer(indexBuffer, mesh.indices.data());
 	IndexedDrawable drawable{};
 	drawable.vertexBuffer = vertexBuffer.buffer;
 	drawable.indexBuffer = indexBuffer.buffer;
-    drawable.indexCount = static_cast<uint32_t>(mesh.indices.size());
+    drawable.details.indexCount = static_cast<uint32_t>(mesh.indices.size());
+	drawable.details.vertexCount = static_cast<uint32_t>(mesh.positions.size());
+	drawable.details.vertexAttributes = mesh.getAvailableVertexAttributes();
+	drawable.details.stride = mesh.getStride();
+	drawable.details.vertexBufferSize = mesh.getSize();
+	drawable.details.indexBufferSize = mesh.getIndexSize();
 	gfxEntity.set<IndexedDrawable>(drawable);
 	return GraphicsObjectHandle{gfxEntity.id()};
 }
 
 bool RehtiGraphics::attachGraphicsObjectToPipeline(PipelineHandle pipelineHandle, GraphicsObjectHandle gfxObjectHandle)
 {
-    return false;
+	flecs::entity pipelineEntity = this->world.entity(pipelineHandle.id);
+	flecs::entity gfxEntity = this->world.entity(gfxObjectHandle.id);
+	if (!pipelineEntity.is_alive() || !gfxEntity.is_alive())
+	{
+		return false;
+	}
+	const IndexedDrawable& gfxDrawable = gfxEntity.get<IndexedDrawable>();
+	pipelineEntity.add<AttachedToPipeline>(gfxEntity);
+	return true;
 }

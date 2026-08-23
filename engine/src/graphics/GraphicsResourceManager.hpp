@@ -9,7 +9,7 @@
 class GraphicsResourceManager
 {
 public:
-	GraphicsResourceManager(uint32_t vkVersion, VkDevice& logDevice, VkPhysicalDevice& gpu, QueueDetails queueDetails);
+	GraphicsResourceManager(uint32_t vkVersion, VkInstance& instance, VkDevice& logDevice, VkPhysicalDevice& gpu, QueueDetails queueDetails);
 	~GraphicsResourceManager();
 
 	Buffer createBuffer(VkDeviceSize size, VkBufferUsageFlags flags, ResourceAllocationDetails allocationDetails = ResourceAllocationDetails(), VmaAllocationInfo* pAllocInfo = nullptr);
@@ -18,7 +18,7 @@ public:
 						VkImageAspectFlags aspects = VK_IMAGE_ASPECT_COLOR_BIT,
 						VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
 						ResourceAllocationDetails allocationDetails = ResourceAllocationDetails(), VmaAllocationInfo* pAllocInfo = nullptr);
-	// Todo image view creation while referencing a image resoure. There can be multiple view for a single image.
+	// Todo image view creation while referencing an image resource. There can be multiple views for a single image.
 
     struct TransitionDetails
 	{

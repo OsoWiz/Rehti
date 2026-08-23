@@ -1,5 +1,6 @@
 #pragma once
 #include <RehtiAsset.hpp>
+#include <optional>
 
 // Structure used to configure the rasterizer state.
 struct RasterizationConfig
@@ -58,8 +59,10 @@ struct DepthStencilConfig
 // Helper structure for configuring graphics pipelines.
 struct GraphicsPipelineConfig
 {
-	ShaderInterface vertexShader;
-	ShaderInterface fragmentShader;
+	PipelineShader vertexShader;
+	std::optional<PipelineShader> tessellationControlShader;
+	std::optional<PipelineShader> tessellationEvaluationShader;
+	PipelineShader fragmentShader;
 
 	RasterizationConfig rasterizationConfig;
 	DepthStencilConfig depthStencilConfig;

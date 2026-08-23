@@ -2,6 +2,7 @@
 #include "Logger.hpp"
 
 #include <flecs.h>
+#include <SDL3/SDL_init.h>
 
 #include <iostream>
 #include <unordered_map>
@@ -52,7 +53,7 @@ int RehtiEngine::initializeRehti(const Configuration& configuration)
 	Logger::instance().initialize(configuration);
 	Logger::info("Initializing Rehti Engine...");
 	instance = std::make_unique<RehtiImpl>(configuration);
-
+	SDL_InitSubSystem(SDL_INIT_EVENTS);
 	// Initialize default components
 	instance->components.push_back({ "Graphics", std::make_unique<RehtiGraphics>(instance->world)});
 	instance->components.push_back({ "ResourceManager", std::make_unique<ResourceManager>(instance->world)});
@@ -82,7 +83,8 @@ void RehtiEngine::cleanupRehti()
 		if (comp.ptr && comp.ptr->isInitialized())
 		{
 			Logger::info("Cleaning up component: " + comp.name);
-			comp.ptr->cleanup();
+			comp.ptr->preDestroy();
+			comp.ptr.reset();
 		}
 		else
 		{
@@ -105,7 +107,7 @@ flecs::world& RehtiEngine::getWorld()
 
 IEngineSubsystem* RehtiEngine::getSubSystemByType(const std::type_info& type)
 {
-	auto subSystemIt = std::find_if(instance->components.begin(), instance->components.end(),
+    auto subSystemIt = std::find_if(instance->components.begin(), instance->components.end(),
 		[&type](const RehtiImpl::EngineComponent& comp) {
 			return typeid(*comp.ptr.get()) == type;
 		});

@@ -1,4 +1,5 @@
 #include "GraphicsUtils.hpp"
+#include <algorithm>
 
 VkFormat getFormatFromEnum(VertexAttributeFlags attribute)
 {
@@ -20,29 +21,6 @@ VkFormat getFormatFromEnum(VertexAttributeFlags attribute)
 			return VK_FORMAT_R32G32B32A32_SFLOAT;
 	}
 	return VK_FORMAT_UNDEFINED;
-}
-
-uint32_t attributeEnumToSize(VertexAttributeFlags venum)
-{
-	switch (venum)
-	{
-		case VertexAttributeFlags::POSITION:
-			return 3;
-		case VertexAttributeFlags::NORMAL:
-			return 3;
-		case VertexAttributeFlags::COLOR:
-			return 4;
-		case VertexAttributeFlags::TEXCOORD:
-			return 2;
-		case VertexAttributeFlags::TANGENT:
-			return 3;
-		case VertexAttributeFlags::JOINTS:
-			return 4;
-		case VertexAttributeFlags::WEIGHTS:
-			return 4;
-		default:
-			return 0;
-	}
 }
 
 VertexAttributeInfo getAttributeInfo(VkFormat format)
@@ -72,27 +50,20 @@ VertexAttributeInfo getAttributeInfo(VkFormat format)
 	return info;
 }
 
-VertexAttributeInfo getAttributeInfo(VertexAttributeFlags attribute)
+std::vector<VertexAttributeInfo> getAttributeInfos(VertexAttributeFlags attributes)
 {
-	switch (attribute)
+	std::vector<VertexAttributeInfo> infos;
+
+	for (VertexAttributeFlags attr = VertexAttributeFlags::POSITION; attr < VertexAttributeFlags::UNDEFINED; attr <<= VertexAttributeFlags::POSITION)
 	{
-		case VertexAttributeFlags::POSITION:
-			return { VK_FORMAT_R32G32B32_SFLOAT, VertexAttributes::Position::getSize() };
-		case VertexAttributeFlags::NORMAL:
-			return { VK_FORMAT_R32G32B32_SFLOAT, VertexAttributes::Normal::getSize() };
-		case VertexAttributeFlags::COLOR:
-			return { VK_FORMAT_R32G32B32A32_SFLOAT, VertexAttributes::Color::getSize() };
-		case VertexAttributeFlags::TEXCOORD:
-			return { VK_FORMAT_R32G32_SFLOAT, VertexAttributes::TexCoord::getSize() };
-		case VertexAttributeFlags::TANGENT:
-			return { VK_FORMAT_R32G32B32_SFLOAT, VertexAttributes::Tangent::getSize() };
-		case VertexAttributeFlags::JOINTS:
-			return { VK_FORMAT_R32G32B32A32_UINT, VertexAttributes::Joints::getSize() };
-		case VertexAttributeFlags::WEIGHTS:
-			return { VK_FORMAT_R32G32B32A32_SFLOAT, VertexAttributes::Weights::getSize() };
-		default:
-			return { VK_FORMAT_UNDEFINED, 0 };
+		if (hasFlag(attributes, attr))
+		{
+			VkFormat format = getFormatFromEnum(attr);
+			infos.push_back(getAttributeInfo(format));
+		}
 	}
+
+	return infos;
 }
 
 std::vector<PlanarVertexInputInfo> getPlanarVertexInputInfo(const Mesh& mesh)
@@ -101,23 +72,19 @@ std::vector<PlanarVertexInputInfo> getPlanarVertexInputInfo(const Mesh& mesh)
 	VertexAttributeFlags attributes = mesh.getAvailableVertexAttributes();
 	using UnderlyingType = std::underlying_type_t<VertexAttributeFlags>;
 	uint32_t binding = 0;
-	for (VertexAttributeFlags attr = VertexAttributeFlags::POSITION; attr < VertexAttributeFlags::UNDEFINED; attr <<= VertexAttributeFlags::POSITION)
+	for (VertexAttributeInfo attributeInfo : getAttributeInfos(attributes))
 	{
-		if (hasFlag(attributes, attr))
-		{
-			VertexAttributeInfo attributeInfo = getAttributeInfo(static_cast<VertexAttributeFlags>(attr));
-			VkVertexInputBindingDescription bindingDescription{};
-			bindingDescription.binding = binding;
-			bindingDescription.stride = attributeInfo.size;
-			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-			VkVertexInputAttributeDescription attributeDescription{};
-			attributeDescription.location = binding;
-			attributeDescription.binding = bindingDescription.binding;
-			attributeDescription.format = attributeInfo.format;
-			attributeDescription.offset = 0u;
-			info.emplace_back(bindingDescription, attributeDescription);
-			binding++;
-		}
+		VkVertexInputBindingDescription bindingDescription{};
+		bindingDescription.binding = binding;
+		bindingDescription.stride = attributeInfo.size;
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		VkVertexInputAttributeDescription attributeDescription{};
+		attributeDescription.location = binding;
+		attributeDescription.binding = bindingDescription.binding;
+		attributeDescription.format = attributeInfo.format;
+		attributeDescription.offset = 0u;
+		info.emplace_back(bindingDescription, attributeDescription);
+		binding++;
 	}
 
 	return info;
@@ -127,9 +94,9 @@ uint32_t calculateOffset(VertexAttributeFlags attribute)
 {
 	uint32_t offset = 0;
 
-	for (uint16_t e = static_cast<std::underlying_type_t<VertexAttributeFlags>>(VertexAttributeFlags::POSITION); e < (uint16_t)attribute; e++)
+	for (const auto& attributeInfo : getAttributeInfos(attribute))
 	{
-		offset += attributeEnumToSize((VertexAttributeFlags)e);
+		offset += attributeInfo.size;
 	}
 	return offset;
 }
@@ -166,6 +133,13 @@ QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physDevice, VkSurfaceKHR s
 		i++;
 	}
 	return indices;
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
+
+{
+	Logger::instance() << "Validation layer: " << pCallbackData->pMessage << std::endl;
+	return VK_FALSE;
 }
 
 SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physDevice, VkSurfaceKHR surface)
@@ -224,6 +198,13 @@ size_t calculateStride(const std::vector<ShaderInterface::ShaderInputOutput>& in
 		stride += Rehti::formatSize(input.format);
 	}
 	return stride;
+}
+
+bool isSubset(const VertexAttributeFlags& superset, const VertexAttributeFlags& subset)
+{
+	uint16_t supersetFlags = static_cast<uint16_t>(superset);
+	uint16_t subsetFlags = static_cast<uint16_t>(subset);
+    return (supersetFlags & subsetFlags) == subsetFlags;
 }
 
 std::vector<uint8_t> Mapping::toBytes(const Mesh& mesh)

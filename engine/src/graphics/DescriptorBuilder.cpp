@@ -145,7 +145,7 @@ VkDescriptorSetLayout DescriptorSetLayoutCache::createDescriptorSetLayout(VkDesc
 	}
 
 	if (!sorted)
-		std::sort(info.bindings.begin(), info.bindings.end(), [](const VkDescriptorSetLayoutBinding& a, const VkDescriptorSetLayoutBinding& b)
+        std::sort(info.bindings.begin(), info.bindings.end(), [](const VkDescriptorSetLayoutBinding& a, const VkDescriptorSetLayoutBinding& b)
 			{
 				return a.binding < b.binding;
 			});

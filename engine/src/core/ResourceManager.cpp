@@ -6,12 +6,6 @@
 
 struct ResourceManager::Backend
 {
-	std::unique_ptr<AssetLoader> graphicsAssetLoader;
-
-	Backend()
-	{
-		graphicsAssetLoader = std::make_unique<AssetLoader>();
-	}
 };
 
 ResourceManager::ResourceManager(flecs::world& world)
@@ -23,10 +17,15 @@ ResourceManager::~ResourceManager()
 {
 }
 
+std::filesystem::path ResourceManager::getDefaultResourcePath()
+{
+    return std::filesystem::path(RESOURCES_DIR);
+}
+
 GraphicsAsset ResourceManager::loadGltfAsset(const std::filesystem::path& filepath)
 {
 	GraphicsAsset asset{};
-	std::vector<GraphicsAssetInternal> assets = this->backendInstance->graphicsAssetLoader->loadModel(filepath.string());
+	std::vector<GraphicsAssetInternal> assets = AssetLoader::load(filepath);
 	Logger::instance() << "Loaded " << assets.size() << " assets from " << filepath.string() << std::endl;
 	for (const auto& a : assets)
 	{
@@ -50,7 +49,7 @@ int ResourceManager::initialize(const Configuration& config)
 	return 0;
 }
 
-int ResourceManager::cleanup()
+int ResourceManager::preDestroy()
 {
 	return 0;
 }

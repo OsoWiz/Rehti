@@ -89,13 +89,6 @@ inline glm::quat interpolateAIQuatkeys(const aiQuatKey& current, const aiQuatKey
 	return interpolateLinear(aiToGlm(prev.mValue), aiToGlm(current.mValue), factor);
 }
 
-AssetLoader::AssetLoader()
-{
-}
-
-AssetLoader::~AssetLoader()
-{
-}
 /**
  * @brief Function for loading
  * @param scene
@@ -268,38 +261,53 @@ size_t fillSkeleton(aiNode* root, std::vector<BoneNode>& bonesToFill, std::vecto
 	return boneCount;
 }
 
-std::vector<GraphicsAssetInternal> AssetLoader::loadModel(std::string path)
+std::vector<GraphicsAssetInternal> AssetLoader::load(std::filesystem::path path)
 {
     std::vector<GraphicsAssetInternal> assets;
 	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_PopulateArmatureData);
-
+	const aiScene* scene = importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_PopulateArmatureData);
+	// TODO the scene may also contain lights, materials etc. We could also load these.
 	for (unsigned int mi = 0; mi < scene->mNumMeshes; mi++)
 	{
 		GraphicsAssetInternal asset{};
 		aiMesh* mesh = scene->mMeshes[mi];
 
-        std::vector<FullVertex> vertices(mesh->mNumVertices);
         std::vector<uint32_t> indices;
 		asset.attributes = VertexAttributeFlags::NONE;
 		// check features
 		if (mesh->HasPositions())
+		{
 			asset.attributes = asset.attributes | VertexAttributeFlags::POSITION;
-		if (mesh->HasNormals())
-			asset.attributes = asset.attributes | VertexAttributeFlags::NORMAL;
+			asset.mesh.positions.resize(mesh->mNumVertices);
+		}
+		if (mesh->HasNormals()) 
+		{
+				asset.attributes = asset.attributes | VertexAttributeFlags::NORMAL;
+				asset.mesh.normals.resize(mesh->mNumVertices);
+		}
 		if (mesh->GetNumColorChannels() > 0)
+		{
 			asset.attributes = asset.attributes | VertexAttributeFlags::COLOR;
+			asset.mesh.colors.resize(mesh->mNumVertices);
+		}
 		if (mesh->HasTextureCoords(0))
+		{
 			asset.attributes = asset.attributes | VertexAttributeFlags::TEXCOORD;
+			asset.mesh.texCoords.resize(mesh->mNumVertices);
+		}
 		if (mesh->HasTangentsAndBitangents())
 		{
 			asset.attributes = asset.attributes | VertexAttributeFlags::TANGENT;
 			asset.attributes = asset.attributes | VertexAttributeFlags::BITANGENT;
+			asset.mesh.tangents.resize(mesh->mNumVertices);
+			asset.mesh.bitangents.resize(mesh->mNumVertices);
 		}
 		if (mesh->HasBones())
 		{
 			asset.attributes = asset.attributes | VertexAttributeFlags::JOINTS;
 			asset.attributes = asset.attributes | VertexAttributeFlags::WEIGHTS;
+			asset.mesh.joints.resize(mesh->mNumVertices);
+			asset.mesh.weights.resize(mesh->mNumVertices);
 			// handle conversion of bone data to format that can be looped over
 			std::map<std::string, uint32_t> nameToIndex;
             std::vector<BoneNode> bones;
@@ -310,7 +318,7 @@ std::vector<GraphicsAssetInternal> AssetLoader::loadModel(std::string path)
 			const Skeleton skeleton{ boneTransformations, bones };
 			asset.skeleton.emplace(skeleton);
 			// The following vector tells how many bones are registered per vertex. (max 4)
-            std::vector<uint32_t> bonesUsed(vertices.size(), 0);
+            std::vector<uint32_t> bonesUsed(mesh->mNumVertices, 0);
 			for (uint32_t bi = 0u; bi < mesh->mNumBones; bi++)
 			{
 				aiBone* bone = mesh->mBones[bi];
@@ -323,8 +331,8 @@ std::vector<GraphicsAssetInternal> AssetLoader::loadModel(std::string path)
 					uint32_t boneCount = bonesUsed[vertexIndex];
 					if (boneCount < 4u)
 					{
-						vertices[vertexIndex].joints[boneCount] = boneIndex;
-						vertices[vertexIndex].weights[boneCount] = weight.mWeight;
+						asset.mesh.joints[vertexIndex][boneCount] = boneIndex;
+						asset.mesh.weights[vertexIndex][boneCount] = weight.mWeight;
 						bonesUsed[vertexIndex]++;
 					}
 				}
@@ -338,18 +346,18 @@ std::vector<GraphicsAssetInternal> AssetLoader::loadModel(std::string path)
 		// loop vertices
 		for (uint32_t vi = 0u; vi < mesh->mNumVertices; vi++)
 		{
-			vertices[vi].position = aiToGlm(mesh->mVertices[vi]);
+			asset.mesh.positions[vi] = aiToGlm(mesh->mVertices[vi]);
 
 			if (mesh->HasNormals())
-				vertices[vi].normal = aiToGlm(mesh->mNormals[vi]);
+				asset.mesh.normals[vi] = aiToGlm(mesh->mNormals[vi]);
 			if (mesh->HasVertexColors(0))
-				vertices[vi].color = aiToGlm(mesh->mColors[0][vi]);
+				asset.mesh.colors[vi] = aiToGlm(mesh->mColors[0][vi]);
 			if (mesh->HasTextureCoords(0))
-				vertices[vi].texCoord = aiToGlm(mesh->mTextureCoords[0][vi]);
+				asset.mesh.texCoords[vi] = aiToGlm(mesh->mTextureCoords[0][vi]);
 			if (mesh->HasTangentsAndBitangents())
 			{
-				vertices[vi].tangent = aiToGlm(mesh->mTangents[vi]);
-				vertices[vi].bitangent = aiToGlm(mesh->mBitangents[vi]);
+				asset.mesh.tangents[vi] = aiToGlm(mesh->mTangents[vi]);
+				asset.mesh.bitangents[vi] = aiToGlm(mesh->mBitangents[vi]);
 			}
 		} // end of vertices for;
 
@@ -363,10 +371,26 @@ std::vector<GraphicsAssetInternal> AssetLoader::loadModel(std::string path)
 		} // end of faces for
 
 		// finalize the asset
-		asset.mesh = fromFullVertices(vertices, asset.attributes);
 		asset.mesh.indices = indices;
 		assets.push_back(asset);
 	} // end of mesh for
 
 	return assets;
+}
+
+// Template specialization for GraphicsAsset
+template<>
+std::shared_ptr<GraphicsAsset> AssetLoader::load<GraphicsAsset>(const std::filesystem::path& path)
+{
+	std::vector<GraphicsAssetInternal> internalAssets = AssetLoader::load(path);
+
+	auto result = std::make_shared<GraphicsAsset>();
+	for (const auto& asset : internalAssets)
+	{
+		result->mesh.positions.insert(result->mesh.positions.end(), 
+			asset.mesh.positions.begin(), asset.mesh.positions.end());
+		result->mesh.indices.insert(result->mesh.indices.end(), 
+			asset.mesh.indices.begin(), asset.mesh.indices.end());
+	}
+	return result;
 }

@@ -37,24 +37,18 @@ struct VertexAttributeInfo
 	size_t size;
 };
 
+std::vector<VertexAttributeInfo> getAttributeInfos(VertexAttributeFlags attributes);
 
-
-VertexAttributeInfo getAttributeInfo(VertexAttributeFlags attribute);
 VertexAttributeInfo getAttributeInfo(VkFormat format);
 
 using PlanarVertexInputInfo = std::pair<VkVertexInputBindingDescription, VkVertexInputAttributeDescription>;
 std::vector<PlanarVertexInputInfo> getPlanarVertexInputInfo(const Mesh& mesh);
 
-// debug callback
 VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* pUserData)
-{
-	Logger::instance() << "Validation layer: " << pCallbackData->pMessage << std::endl;
-	return VK_FALSE;
-}
+	void* pUserData);
 
 SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice physDevice, VkSurfaceKHR surface);
 QueueFamilyIndices findQueueFamilies(VkPhysicalDevice physDevice, VkSurfaceKHR surface);
@@ -62,6 +56,9 @@ VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMes
 void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
 
 size_t calculateStride(const std::vector<ShaderInterface::ShaderInputOutput>& inputs);
+
+// checks whether the first parameter is the superset of the second parameter
+bool isSubset(const VertexAttributeFlags& superset, const VertexAttributeFlags& subset);
 
 namespace Mapping
 {

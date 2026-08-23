@@ -7,11 +7,6 @@
 
 class Configuration;
 
-struct CompiledShaderHandle
-{
-	uint64_t id;
-};
-
 struct PipelineHandle
 {
 	uint64_t id;
@@ -21,6 +16,9 @@ struct GraphicsObjectHandle
 {
 	uint64_t id;
 };
+
+struct AttachedToPipeline
+{};
 
 namespace RehtiGraphicsUtil {
 
@@ -50,24 +48,17 @@ public:
 
 	int initialize(const Configuration& config) override;
 
-	int cleanup() override;
+	int preDestroy() override;
 
 	bool isInitialized() const override;
 
 	// Draws a frame as configured.
 	void drawFrame() const;
 
-	CompiledShaderHandle compileShader(const ShaderAsset& shader);
 	PipelineHandle createGraphicsPipeline(const GraphicsPipelineConfig& pipelineConfig);
 	GraphicsObjectHandle createGraphicsObject(const Mesh& mesh);
 
 	bool attachGraphicsObjectToPipeline(PipelineHandle pipelineHandle, GraphicsObjectHandle gfxObjectHandle);
-	// Or should it reference an entity created somewhere else.
-	// Does mesh exist without an entity.
-	// or is entity created when mesh is created.
-	// What if you want to use the same mesh with multiple entities. Then this makes no sense:
-	// attachGraphicsObject(Mesh& mesh, flecs::entity entity); because how do you know if two meshes are the same?
-	// Should this return handles on created objects???? (Another struct for same object representation??) Makes no sense either.
 
 private:
 	RehtiGraphics(const RehtiGraphics&) = delete;

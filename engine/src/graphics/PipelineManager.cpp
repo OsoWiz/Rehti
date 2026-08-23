@@ -1,6 +1,7 @@
 #include "PipelineManager.hpp"
 #include "Logger.hpp"
 #include "GraphicsUtils.hpp"
+#include "RehtiException.hpp"
 
 std::vector<VkVertexInputAttributeDescription> PipelineShaderData::getVertexAttributes(uint32_t binding) const
 {
@@ -13,15 +14,14 @@ std::vector<VkVertexInputAttributeDescription> PipelineShaderData::getVertexAttr
 	std::vector<VkVertexInputAttributeDescription> result;
 	uint32_t offset = 0;
 	uint32_t location = 0;
-	for (const auto& [attribute, format] : vertexShaderData.value().inputAttributes)
+	for (const VertexAttributeInfo& attribute : getAttributeInfos(getAttributes()))
 	{
 		VkVertexInputAttributeDescription desc{};
 		desc.binding = binding;
 		desc.location = location;
-		desc.format = format;
+		desc.format = attribute.format;
 		desc.offset = offset;
-		VertexAttributeInfo info = getAttributeInfo(attribute);
-		offset += info.size;
+		offset += attribute.size;
 		result.push_back(desc);
 		location++;
 	}
@@ -79,7 +79,7 @@ std::vector<VkDescriptorSetLayout> PipelineShaderData::getDescriptorSetLayouts()
 	{
 		if (merged[i] == VK_NULL_HANDLE)
 		{
-			Logger::warning("Descriptor set layout gap detected before highest used set");
+			Logger::warning("Descriptor set layout gap detected before highest used set " + std::to_string(highestUsedSet));
 			return {};
 		}
 	}
@@ -164,39 +164,28 @@ std::vector<VkPipelineShaderStageCreateInfo> PipelineShaderData::getShaderStageI
 	return stages;
 }
 
-uint32_t PipelineShaderData::getStride() const
+size_t PipelineShaderData::getStride() const
 {
 	if (!vertexShaderData.has_value())
 	{
-		std::cerr << "Error: No vertex shader currently set!" << std::endl;
+		Logger::error("Error: No vertex shader currently set!");
 		return {};
 	}
-	uint32_t stride = 0;
-	for (const auto& [attribute, format] : vertexShaderData.value().inputAttributes)
-	{
-		VertexAttributeInfo info = getAttributeInfo(attribute);
-		stride += info.size;
-	}
-	return stride;
+	return calculateStride(vertexShaderData.value().interface.inputs);
 }
 
 VertexAttributeFlags PipelineShaderData::getAttributes() const
 {
 	if (!vertexShaderData.has_value())
 	{
-		std::cerr << "Error: No vertex shader currently set!" << std::endl;
+		Logger::error("Error: No vertex shader currently set!");
 		return {};
 	}
-	VertexAttributeFlags flags = VertexAttributeFlags::NONE;
-	for (const auto& [attribute, format] : vertexShaderData.value().inputAttributes)
-	{
-		flags |= attribute;
-	}
-	return flags;
+	return vertexShaderData.value().getInputAttributeFlags();
 }
 
 PipelineManager::PipelineManager(VkDevice& logDevice)
-	: logDevice(logDevice)
+	: logDevice(logDevice), shaderTools(std::make_unique<ShaderTools>(logDevice))
 {
 }
 
@@ -208,17 +197,24 @@ PipelineManager::~PipelineManager()
 	}
 }
 
-CompiledPipelineData PipelineManager::createPipeline(const PipelineShaderData& pipelineShaders, const GraphicsPipelineConfig& config, const PipelineCreationDetails& details)
+CompiledPipelineData PipelineManager::createPipeline(const GraphicsPipelineConfig& config, const PipelineCreationDetails& details)
 {
+	PipelineShaderData pipelineShaders = getPipelineShaders(config);
 	CompiledPipelineData compiledPipeline{};
-
-	std::vector<VkVertexInputAttributeDescription> attributeDescs = Mapping::getVertexAttributeDescriptions(config.vertexShader, 0);
+	std::vector<VkDynamicState> dynamicStates = getDynamicStates();
+	bool dynamicStride = std::find(dynamicStates.begin(), dynamicStates.end(), VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE) != dynamicStates.end();
+	std::vector<VkVertexInputAttributeDescription> attributeDescs = Mapping::getVertexAttributeDescriptions(config.vertexShader.shaderInterface, 0);
 	std::vector<VkVertexInputBindingDescription> bindingDescs{};
+
+	// todo if dynamic vertex input state, set these at recording time.
 	if (details.interleavedVertexData)
 	{
 		VkVertexInputBindingDescription bindingDesc{};
 		bindingDesc.binding = 0;
-		bindingDesc.stride = pipelineShaders.getStride();
+		if (!dynamicStride)
+		{ // if dynamic state is not found, calculate stride.
+			bindingDesc.stride = pipelineShaders.getStride();
+		}
 		bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		bindingDescs.push_back(bindingDesc);
 	}
@@ -230,7 +226,10 @@ CompiledPipelineData PipelineManager::createPipeline(const PipelineShaderData& p
 			VkVertexInputBindingDescription bindingDesc{};
 			bindingDesc.binding = binding;
 			VertexAttributeInfo info = getAttributeInfo(attribute.format);
-			bindingDesc.stride = info.size;
+			if (!dynamicStride)
+			{ // does this work with multiple binding descriptions?
+				bindingDesc.stride = info.size;
+			}
 			bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 			bindingDescs.push_back(bindingDesc);
 			binding++;
@@ -249,10 +248,6 @@ CompiledPipelineData PipelineManager::createPipeline(const PipelineShaderData& p
 	inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
-	std::vector<VkDynamicState> dynamicStates = { // always include at least viewport and scissor as dynamic states
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR
-	};
 
 	VkPipelineViewportStateCreateInfo viewportInfo{};
 	viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -312,13 +307,15 @@ CompiledPipelineData PipelineManager::createPipeline(const PipelineShaderData& p
 	// Create pipelinelayout for the given object
 	VkPipelineLayout newLayout;
 	if (vkCreatePipelineLayout(logDevice, &pipelinelayoutInfo, nullptr, &newLayout))
-		throw std::runtime_error("Pipeline layout creation failed");
+	{
+		throw new RehtiException(RehtiError::GRAPHICS_INITIALIZATION_FAILED, "Failed to create a pipeline layout!");
+	}
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
 	depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStencilInfo.depthTestEnable = static_cast<VkBool32>(config.depthStencilConfig.depthTestEnable);
 	depthStencilInfo.depthWriteEnable = VK_TRUE;
-	depthStencilInfo.depthCompareOp = static_cast<VkCompareOp>(config.depthStencilConfig.depthCompareOp); // this is sus but should work.
+	depthStencilInfo.depthCompareOp = static_cast<VkCompareOp>(config.depthStencilConfig.depthCompareOp); // this should work.
 	depthStencilInfo.depthBoundsTestEnable = VK_FALSE;
 	depthStencilInfo.minDepthBounds = config.depthStencilConfig.depthBounds.first;
 	depthStencilInfo.maxDepthBounds = config.depthStencilConfig.depthBounds.second;
@@ -361,15 +358,18 @@ CompiledPipelineData PipelineManager::createPipeline(const PipelineShaderData& p
 
 	// Create the actual pipeline
 	VkPipeline newPipeline;
-    if (vkCreateGraphicsPipelines(logDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS)
-		throw std::runtime_error("Pipeline layout creation failed");
+	if (vkCreateGraphicsPipelines(logDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS)
+	{
+		throw new RehtiException(RehtiError::GRAPHICS_INITIALIZATION_FAILED, "Failed to create a graphics pipeline!");
+	}
 
 	// Add the pipeline to the map
-	this->pipelines.push_back(compiledPipeline);
 	compiledPipeline.vertexAttributes = pipelineShaders.getAttributes();
 	compiledPipeline.pipeline = newPipeline;
+	compiledPipeline.layout = newLayout;
 	compiledPipeline.descriptorSetLayouts = descLayouts;
 	compiledPipeline.pushConstantRanges = pipelineShaders.getPushConstantRanges();
+	this->pipelines.push_back(compiledPipeline);
 	return compiledPipeline;
 }
 
@@ -384,4 +384,23 @@ std::optional<CompiledPipelineData> PipelineManager::findPipeline(VertexAttribut
 		return *it;
 	}
 	return std::nullopt;
+}
+
+std::vector<VkDynamicState> PipelineManager::getDynamicStates() const
+{
+    return {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE };
+}
+
+PipelineShaderData PipelineManager::getPipelineShaders(const GraphicsPipelineConfig& config)
+{
+	PipelineShaderData shaderData;
+	shaderData.vertexShaderData = shaderTools->compileShader(config.vertexShader.shaderAsset);
+	shaderData.fragmentShaderData = shaderTools->compileShader(config.fragmentShader.shaderAsset);
+	if (config.tessellationControlShader.has_value() && config.tessellationEvaluationShader.has_value())
+	{
+		shaderData.tessControlShaderData = shaderTools->compileShader(config.tessellationControlShader->shaderAsset);
+		shaderData.tessEvalShaderData = shaderTools->compileShader(config.tessellationEvaluationShader->shaderAsset);
+	}
+
+	return shaderData;
 }

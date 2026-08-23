@@ -8,11 +8,12 @@
 #include <vulkan/vulkan.h>
 #include <vma/vk_mem_alloc.h>
 
-GraphicsResourceManager::GraphicsResourceManager(uint32_t vkVersion, VkDevice& logDevice, VkPhysicalDevice& gpu, QueueDetails queueDetails)
+GraphicsResourceManager::GraphicsResourceManager(uint32_t vkVersion, VkInstance& instance, VkDevice& logDevice, VkPhysicalDevice& gpu, QueueDetails queueDetails)
 	:logDevice(logDevice), gpu(gpu), queue(queueDetails.queue)
 {
 	VmaAllocatorCreateInfo allocatorInfo{};
 	allocatorInfo.vulkanApiVersion = vkVersion;
+	allocatorInfo.instance = instance;
 	allocatorInfo.device = logDevice;
 	allocatorInfo.physicalDevice = gpu;
 
