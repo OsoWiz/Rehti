@@ -72,7 +72,7 @@ set(ENGINE_SOURCES
 	${CORE_SOURCE_DIR}/RehtiAlloc.cpp
 	${REHTI_INCLUDE_DIR}/ResourceManager.hpp
 	${CORE_SOURCE_DIR}/ResourceManager.cpp
-	${CORE_SOURCE_DIR}/AssetLoader.hpp
+	${REHTI_INCLUDE_DIR}/AssetLoader.hpp
 	${CORE_SOURCE_DIR}/AssetLoader.cpp
 	${REHTI_INCLUDE_DIR}/BasicAttributes.hpp
 	${CORE_SOURCE_DIR}/BasicAttributes.cpp
@@ -81,6 +81,10 @@ set(ENGINE_SOURCES
 	${REHTI_INCLUDE_DIR}/GraphicsTypes.hpp
 	${CORE_SOURCE_DIR}/TaggedPointer.hpp
 	${CORE_SOURCE_DIR}/TaggedPointer.cpp
+	${CORE_SOURCE_DIR}/EventHandlerService.hpp
+	${CORE_SOURCE_DIR}/EventHandlerService.cpp
+	${CORE_SOURCE_DIR}/SDLEventHandler.hpp
+	${CORE_SOURCE_DIR}/SDLEventHandler.cpp
 	${REHTI_INCLUDE_DIR}/EngineSubsystem.hpp
 	${CORE_SOURCE_DIR}/EngineSubsystem.cpp
 	${REHTI_INCLUDE_DIR}/FlagUtils.hpp

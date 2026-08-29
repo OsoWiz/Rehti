@@ -1,8 +1,6 @@
 #pragma once
 #include <EngineSubsystem.hpp>
 
-// TODO move/separate + add more.
-
 enum class EventType
 {
 	Keyboard,

@@ -36,9 +36,10 @@ public:
 	 */
 	static flecs::world& getWorld();
 
-	// TODO If the loop lives here there needs to be some sort of translation
-	// from SDL events to consumers (subsystems)
-	void eventLoop();
+	/**
+	 * @brief Progresses the world by reading events and updating enabled subsystems.
+	 */
+	void progress();
 
 private:
 	class RehtiImpl;

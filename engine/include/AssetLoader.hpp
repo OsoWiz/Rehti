@@ -7,7 +7,7 @@
 
 namespace AssetLoader
 {
-	// Legacy load for old graphics asset loader. Todo change naming at least.
+	// Legacy load for old graphics assetloader. Todo change naming at least.
 	std::vector<GraphicsAssetInternal> load(std::filesystem::path path);
 
 	// Free function template for generic resource loading
